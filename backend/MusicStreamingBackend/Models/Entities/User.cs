@@ -38,6 +38,7 @@ namespace Models.Entities
         public ICollection<ContentShare> ContentSharesSent { get; set; } = new List<ContentShare>();
         public ICollection<ContentShare> ContentSharesReceived { get; set; } = new List<ContentShare>();
         public ICollection<ContentComment> ContentComments { get; set; } = new List<ContentComment>();
+        public ICollection<UserActivity> UserActivities { get; set; } = new List<UserActivity>();
         public ICollection<Conversation> ConversationsAsA { get; set; } = new List<Conversation>();
         public ICollection<Conversation> ConversationsAsB { get; set; } = new List<Conversation>();
         public ICollection<Message> Messages { get; set; } = new List<Message>();

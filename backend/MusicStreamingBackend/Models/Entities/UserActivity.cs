@@ -5,17 +5,19 @@ using Models.Constants;
 
 namespace Models.Entities
 {
-    [Table("ContentShares")]
-    public class ContentShare
+    [Table("UserActivities")]
+    public class UserActivity
     {
         [Key]
         public Guid Id { get; set; }
         
         [Required]
-        public Guid SharerId { get; set; }
+        public Guid UserId { get; set; }
         
-        public Guid? SharedToUserId { get; set; }
-        
+        [Required]
+        [MaxLength(50)]
+        public string ActivityType { get; set; } = ActivityTypes.SHARE;
+
         [Required]
         public Guid ContentId { get; set; }
         
@@ -25,10 +27,8 @@ namespace Models.Entities
 
         [MaxLength(1000)]
         public string? Message { get; set; }
-
+        
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
-
-        public User Sharer { get; set; } = null!;
-        public User? SharedToUser { get; set; }
+        public User User { get; set; } = null!;
     }
 }

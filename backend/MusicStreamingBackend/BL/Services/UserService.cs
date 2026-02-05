@@ -28,7 +28,7 @@ namespace BL.Services
         }
         public async Task<User?> GetUserByIdAsync(Guid userId)
         {
-            return await _userRepository.GetUserByIdAsync(userId);
+            return await _userRepository.GetByIdAsync(userId);
         }
         public async Task<User?> GetUserByEmailAsync(string email)
         {
@@ -42,11 +42,11 @@ namespace BL.Services
         }
         public async Task<User> AddUserAsync(User user)
         {
-            return await _userRepository.AddUserAsync(user);
+            return await _userRepository.AddAsync(user);
         }
         public async Task<User> UpdateUserAsync(User user)
         {
-            var updatedUser = await _userRepository.UpdateUserAsync(user);
+            var updatedUser = await _userRepository.UpdateAsync(user);
             if (updatedUser == null)
                 throw new InvalidOperationException("Failed to update the user.");
 
@@ -54,18 +54,18 @@ namespace BL.Services
         }
         public async Task<User> UpdateUserProfileAsync(Guid userId, string? bio, byte[]? profileImage)
         {
-            var user = await _userRepository.GetUserByIdAsync(userId);
+            var user = await _userRepository.GetByIdAsync(userId);
             if (user == null)
                 throw new InvalidOperationException("User not found.");
 
             user.Bio = bio ?? user.Bio;
             user.ProfileImage = profileImage ?? user.ProfileImage;
 
-            return await _userRepository.UpdateUserAsync(user);
+            return await _userRepository.UpdateAsync(user);
         }
         public async Task<User?> DeleteUserAsync(Guid userId)
         {
-            return await _userRepository.DeleteUserAsync(userId);
+            return await _userRepository.DeleteAsync(userId);
         }
         public async Task<bool> IsEmailTakenAsync(string email)
         {

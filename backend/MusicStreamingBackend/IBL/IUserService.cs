@@ -14,10 +14,12 @@ namespace IBL
         Task<User?> GetUserByIdAsync(Guid userId);
         Task<User?> GetUserByEmailAsync(string email);
         Task<User?> GetUserByUsernameAsync(string username);
+
         Task<User> AddUserAsync(User user);
         Task<User> UpdateUserAsync(User user);
         Task<User> UpdateUserProfileAsync(Guid userId, string? bio, byte[]? profileImage);
         Task<User?> DeleteUserAsync(Guid userId);
+
         Task<bool> IsEmailTakenAsync(string email);
         Task<bool> IsUsernameTakenAsync(string username);
         

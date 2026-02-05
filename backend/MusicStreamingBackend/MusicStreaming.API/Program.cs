@@ -23,7 +23,33 @@ builder.Services.AddDbContext<MusicStreamingContext>(options =>
         x => x.MigrationsAssembly("DAL")));
 
 builder.Services.AddScoped<IUserRepository, UserRepository>();
+builder.Services.AddScoped<ILocalTrackRepository, LocalTrackRepository>();
+builder.Services.AddScoped<IPlaylistRepository, PlaylistRepository>();
+builder.Services.AddScoped<IPlaylistTrackRepository, PlaylistTrackRepository>();
+builder.Services.AddScoped<IUserFollowsRepository, UserFollowsRepository>();
+builder.Services.AddScoped<IContentLikeRepository, ContentLikeRepository>();
+builder.Services.AddScoped<IContentShareRepository, ContentShareRepository>();
+builder.Services.AddScoped<IContentCommentRepository, ContentCommentRepository>();
+builder.Services.AddScoped<IContentStatRepository, ContentStatRepository>();
+builder.Services.AddScoped<IContentPlayRepository, ContentPlayRepository>();
+builder.Services.AddScoped<IUserActivityRepository, UserActivityRepository>();
+builder.Services.AddScoped<IConversationRepository, ConversationRepository>();
+builder.Services.AddScoped<IMessageRepository, MessageRepository>();
+
 builder.Services.AddScoped<IUserService, UserService>();
+/*builder.Services.AddScoped<ILocalTrackService, LocalTrackService>();
+builder.Services.AddScoped<IPlaylistService, PlaylistService>();
+builder.Services.AddScoped<IPlaylistTrackService, PlaylistTrackService>();
+builder.Services.AddScoped<IUserFollowsService, UserFollowsService>();
+builder.Services.AddScoped<IContentLikeService, ContentLikeService>();
+builder.Services.AddScoped<IContentShareService, ContentShareService>();
+builder.Services.AddScoped<IContentCommentService, ContentCommentService>();
+builder.Services.AddScoped<IContentStatService, ContentStatService>();
+builder.Services.AddScoped<IContentPlayService, ContentPlayService>();
+builder.Services.AddScoped<IUserActivityService, UserActivityService>();
+builder.Services.AddScoped<IConversationService, ConversationService>();
+builder.Services.AddScoped<IMessageService, MessageService>();*/
+
 builder.Services.AddScoped<IPasswordHasher<User>, PasswordHasher<User>>();
 builder.Services.AddScoped<IAuthTokenService, AuthTokenService>();
 

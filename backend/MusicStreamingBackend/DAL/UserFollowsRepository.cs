@@ -8,37 +8,26 @@ using System.Threading.Tasks;
 
 namespace DAL
 {
-    public class UserFollowsRepository : IUserFollowsRepository
+    public class UserFollowsRepository : Repository<UserFollows>, IUserFollowsRepository
     {
-        private readonly MusicStreamingContext _context;
-        public UserFollowsRepository(MusicStreamingContext context)
+        public UserFollowsRepository(MusicStreamingContext context) : base(context)
         {
-            _context = context;
         }
 
         public IQueryable<UserFollows> GetUserFollows()
         {
-            return _context.UserFollows;
+            return GetAll();
         }
 
         public async Task<UserFollows?> GetUserFollowAsync(Guid followerId, Guid followingId)
         {
-            return await _context.UserFollows
+            return await _dbSet
                 .FirstOrDefaultAsync(f => f.FollowerId == followerId && f.FollowingId == followingId);
         }
 
         public async Task<UserFollows> AddUserFollowAsync(UserFollows follow)
         {
-            await _context.UserFollows.AddAsync(follow);
-            await _context.SaveChangesAsync();
-            return follow;
-        }
-
-        public async Task<UserFollows> UpdateUserFollowAsync(UserFollows follow)
-        {
-            _context.UserFollows.Update(follow);
-            await _context.SaveChangesAsync();
-            return follow;
+            return await AddAsync(follow);
         }
 
         public async Task<UserFollows?> DeleteUserFollowAsync(Guid followerId, Guid followingId)
@@ -47,7 +36,7 @@ namespace DAL
             if (follow == null)
                 return null;
 
-            _context.UserFollows.Remove(follow);
+            _dbSet.Remove(follow);
             await _context.SaveChangesAsync();
             return follow;
         }

@@ -21,6 +21,8 @@ namespace DAL.Context
         public DbSet<ContentShare> ContentShares => Set<ContentShare>();
         public DbSet<ContentComment> ContentComments => Set<ContentComment>();
         public DbSet<ContentStat> ContentStats => Set<ContentStat>();
+        public DbSet<ContentPlay> ContentPlays => Set<ContentPlay>();
+        public DbSet<UserActivity> UserActivities => Set<UserActivity>();
         public DbSet<Conversation> Conversations => Set<Conversation>();
         public DbSet<Message> Messages => Set<Message>();
 
@@ -71,7 +73,10 @@ namespace DAL.Context
                 .HasOne(cs => cs.SharedToUser)
                 .WithMany(u => u.ContentSharesReceived)
                 .HasForeignKey(cs => cs.SharedToUserId)
-                .OnDelete(DeleteBehavior.Restrict);
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<ContentShare>()
+                .HasIndex(cs => new { cs.ContentId, cs.ContentType });
 
             modelBuilder.Entity<ContentComment>()
                 .HasOne(cc => cc.User)
@@ -88,6 +93,31 @@ namespace DAL.Context
             modelBuilder.Entity<ContentStat>()
                 .HasIndex(cs => new { cs.ContentId, cs.ContentType })
                 .IsUnique();
+
+            modelBuilder.Entity<ContentPlay>()
+                .HasOne(cp => cp.User)
+                .WithMany()
+                .HasForeignKey(cp => cp.UserId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<ContentPlay>()
+                .HasIndex(cp => new { cp.ContentId, cp.PlayedAt });
+
+            modelBuilder.Entity<ContentPlay>()
+                .HasIndex(cp => cp.UserId)
+                .HasFilter("[UserId] IS NOT NULL");
+
+            modelBuilder.Entity<UserActivity>()
+                .HasOne(ua => ua.User)
+                .WithMany(u => u.UserActivities)
+                .HasForeignKey(ua => ua.UserId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<UserActivity>()
+                .HasIndex(ua => new { ua.UserId, ua.CreatedAt });
+
+            modelBuilder.Entity<UserActivity>()
+                .HasIndex(ua => new { ua.ContentId, ua.ContentType });
 
             modelBuilder.Entity<Conversation>()
                 .HasOne(c => c.ParticipantA)

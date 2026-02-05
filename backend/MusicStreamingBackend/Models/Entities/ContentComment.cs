@@ -16,7 +16,7 @@ namespace Models.Entities
         public Guid ContentId { get; set; }
         [Required]
         [MaxLength(20)]
-        public string ContentType { get; set; } = ContentTypes.TRACK; // "TRACK" or "PLAYLIST"
+        public string ContentType { get; set; } = ContentTypes.TRACK; 
         
         public Guid? ParentCommentId { get; set; }
 

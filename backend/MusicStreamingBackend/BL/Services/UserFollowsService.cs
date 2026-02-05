@@ -22,8 +22,8 @@ namespace BL.Services
             if (followerId == followedUserId)
                 throw new InvalidOperationException("Cannot follow yourself.");
 
-            var follower = await _userRepository.GetUserByIdAsync(followerId);
-            var following = await _userRepository.GetUserByIdAsync(followedUserId);
+            var follower = await _userRepository.GetByIdAsync(followerId);
+            var following = await _userRepository.GetByIdAsync(followedUserId);
             if (follower == null || following == null)
                 throw new InvalidOperationException("User(s) not found.");
 
