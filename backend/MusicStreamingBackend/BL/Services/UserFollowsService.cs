@@ -2,6 +2,7 @@ using IDAL;
 using Microsoft.EntityFrameworkCore;
 using Models.Entities;
 using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 
 namespace BL.Services
@@ -33,6 +34,7 @@ namespace BL.Services
 
             var follow = new UserFollows
             {
+                Id = Guid.NewGuid(),
                 FollowerId = followerId,
                 FollowingId = followedUserId,
                 CreatedAt = DateTime.UtcNow
@@ -60,6 +62,26 @@ namespace BL.Services
         {
             return await _followsRepository.GetUserFollows()
                 .CountAsync(f => f.FollowerId == userId);
+        }
+
+        public async Task<List<User>> GetFollowersAsync(Guid userId)
+        {
+            return await _followsRepository.GetUserFollows()
+                .Where(f => f.FollowingId == userId)
+                .Include(f => f.Follower)
+                .Select(f => f.Follower)
+                .OrderBy(u => u.Username)
+                .ToListAsync();
+        }
+
+        public async Task<List<User>> GetFollowingAsync(Guid userId)
+        {
+            return await _followsRepository.GetUserFollows()
+                .Where(f => f.FollowerId == userId)
+                .Include(f => f.Following)
+                .Select(f => f.Following)
+                .OrderBy(u => u.Username)
+                .ToListAsync();
         }
     }
 }

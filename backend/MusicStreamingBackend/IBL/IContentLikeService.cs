@@ -1,8 +1,6 @@
-﻿using Models.Entities;
+using Models.Entities;
 using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 
 namespace IBL
@@ -11,6 +9,9 @@ namespace IBL
     {
         Task<int> GetLikeCountAsync(Guid contentId, string contentType);
         Task<bool> IsContentLikedByUserAsync(Guid userId, Guid contentId, string contentType);
+
+        Task<List<ContentLike>> GetLikedContentByUserAsync(Guid userId, string contentType);
+        Task<List<LocalTrack>> GetLikedTracksByUserAsync(Guid userId);
 
         Task<ContentLike> LikeContentAsync(Guid userId, Guid contentId, string contentType);
         Task<bool> UnlikeContentAsync(Guid userId, Guid contentId, string contentType);

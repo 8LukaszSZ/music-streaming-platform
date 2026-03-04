@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using Models.Entities;
 using System;
 using System.Collections.Generic;
@@ -39,7 +39,8 @@ namespace DAL.Context
                 .IsUnique();
 
             modelBuilder.Entity<UserFollows>()
-                .HasKey(uf => new { uf.FollowerId, uf.FollowingId });
+                .HasIndex(uf => new { uf.FollowerId, uf.FollowingId })
+                .IsUnique();
 
             modelBuilder.Entity<UserFollows>()
                 .HasOne(uf => uf.Follower)
@@ -105,7 +106,7 @@ namespace DAL.Context
 
             modelBuilder.Entity<ContentPlay>()
                 .HasIndex(cp => cp.UserId)
-                .HasFilter("[UserId] IS NOT NULL");
+                .HasFilter("\"UserId\" IS NOT NULL");
 
             modelBuilder.Entity<UserActivity>()
                 .HasOne(ua => ua.User)

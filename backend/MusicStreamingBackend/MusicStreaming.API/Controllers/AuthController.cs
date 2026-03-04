@@ -1,4 +1,5 @@
 using IBL;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Models.Constants;
@@ -27,6 +28,7 @@ namespace MusicStreaming.API.Controllers
 
         // POST: api/auth/register
         [HttpPost("register")]
+        [AllowAnonymous]
         public async Task<ActionResult<UserResponseDto>> Register([FromBody] RegisterRequestDto dto)
         {
             if (!ModelState.IsValid)
@@ -74,6 +76,7 @@ namespace MusicStreaming.API.Controllers
 
         // POST: api/auth/login
         [HttpPost("login")]
+        [AllowAnonymous]
         public async Task<ActionResult<LoginResponseDto>> Login([FromBody] LoginRequestDto dto)
         {
             if (!ModelState.IsValid)
@@ -112,6 +115,42 @@ namespace MusicStreaming.API.Controllers
             };
 
             return Ok(response);
+        }
+
+        // PUT: api/auth/change-password
+        [HttpPut("change-password")]
+        [Authorize(Roles = $"{UserRoles.User},{UserRoles.Admin}")]
+        public async Task<ActionResult> ChangePassword([FromBody] ChangePasswordRequestDto dto)
+        {
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ModelState);
+            }
+
+            var userIdClaim = User.FindFirst(System.IdentityModel.Tokens.Jwt.JwtRegisteredClaimNames.Sub)
+                               ?? User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier);
+
+            if (userIdClaim == null || !Guid.TryParse(userIdClaim.Value, out var userId))
+            {
+                return Unauthorized();
+            }
+
+            var user = await _userService.GetUserByIdAsync(userId);
+            if (user == null)
+            {
+                return NotFound();
+            }
+
+            var verify = _passwordHasher.VerifyHashedPassword(user, user.PasswordHash, dto.CurrentPassword);
+            if (verify == PasswordVerificationResult.Failed)
+            {
+                return BadRequest(new { message = "Current password is incorrect." });
+            }
+
+            user.PasswordHash = _passwordHasher.HashPassword(user, dto.NewPassword);
+            await _userService.UpdateUserAsync(user);
+
+            return NoContent();
         }
 
     }

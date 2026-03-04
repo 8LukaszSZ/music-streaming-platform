@@ -1,4 +1,4 @@
-﻿using IBL;
+using IBL;
 using IDAL;
 using Microsoft.EntityFrameworkCore;
 using Models.Entities;
@@ -24,7 +24,9 @@ namespace BL.Services
         }
         public async Task<List<User>> GetAllUsersAsync()
         {
-            return await _userRepository.GetUsers().ToListAsync();
+            return await _userRepository.GetUsers()
+                .OrderByDescending(u => u.CreatedAt)
+                .ToListAsync();
         }
         public async Task<User?> GetUserByIdAsync(Guid userId)
         {
@@ -40,8 +42,25 @@ namespace BL.Services
             return await _userRepository.GetUsers()
                 .FirstOrDefaultAsync(u => u.Username == username);
         }
+        public async Task<List<User>> SearchUsersAsync(string query)
+        {
+            if (string.IsNullOrWhiteSpace(query))
+            {
+                return new List<User>();
+            }
+
+            var normalized = query.Trim().ToLower();
+
+            return await _userRepository.GetUsers()
+                .Where(u => u.Username.ToLower().Contains(normalized))
+                .OrderBy(u => u.Username)
+                .Take(50)
+                .ToListAsync();
+        }
         public async Task<User> AddUserAsync(User user)
         {
+            if (user.Id == Guid.Empty)
+                user.Id = Guid.NewGuid();
             return await _userRepository.AddAsync(user);
         }
         public async Task<User> UpdateUserAsync(User user)
@@ -74,6 +93,15 @@ namespace BL.Services
         public async Task<bool> IsUsernameTakenAsync(string username)
         {
             return await _userRepository.GetUsers().AnyAsync(u => u.Username == username);
+        }
+        public async Task<User> UpdateUserRoleAsync(Guid userId, string role)
+        {
+            var user = await _userRepository.GetByIdAsync(userId);
+            if (user == null)
+                throw new InvalidOperationException("User not found.");
+
+            user.Role = role;
+            return await _userRepository.UpdateAsync(user);
         }
     }
 }

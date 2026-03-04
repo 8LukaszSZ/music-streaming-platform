@@ -37,7 +37,7 @@ builder.Services.AddScoped<IConversationRepository, ConversationRepository>();
 builder.Services.AddScoped<IMessageRepository, MessageRepository>();
 
 builder.Services.AddScoped<IUserService, UserService>();
-/*builder.Services.AddScoped<ILocalTrackService, LocalTrackService>();
+builder.Services.AddScoped<ILocalTrackService, LocalTrackService>();
 builder.Services.AddScoped<IPlaylistService, PlaylistService>();
 builder.Services.AddScoped<IPlaylistTrackService, PlaylistTrackService>();
 builder.Services.AddScoped<IUserFollowsService, UserFollowsService>();
@@ -48,7 +48,7 @@ builder.Services.AddScoped<IContentStatService, ContentStatService>();
 builder.Services.AddScoped<IContentPlayService, ContentPlayService>();
 builder.Services.AddScoped<IUserActivityService, UserActivityService>();
 builder.Services.AddScoped<IConversationService, ConversationService>();
-builder.Services.AddScoped<IMessageService, MessageService>();*/
+builder.Services.AddScoped<IMessageService, MessageService>();
 
 builder.Services.AddScoped<IPasswordHasher<User>, PasswordHasher<User>>();
 builder.Services.AddScoped<IAuthTokenService, AuthTokenService>();

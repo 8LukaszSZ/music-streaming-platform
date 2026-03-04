@@ -1,8 +1,12 @@
-﻿using IBL;
+using IBL;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Models.Constants;
 using Models.DTOs.Auth;
+using Models.DTOs.User;
+using MusicStreaming.API.Extensions;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
 
 namespace MusicStreaming.API.Controllers
 {
@@ -19,8 +23,9 @@ namespace MusicStreaming.API.Controllers
         }
 
         // GET: api/user
+        // Pełna lista użytkowników tylko dla administratora
         [HttpGet]
-        [Authorize(Roles = $"{UserRoles.User},{UserRoles.Admin}")]
+        [Authorize(Roles = UserRoles.Admin)]
         public async Task<ActionResult<IEnumerable<UserResponseDto>>> GetAll()
         {
             var users = await _userService.GetAllUsersAsync();
@@ -48,6 +53,33 @@ namespace MusicStreaming.API.Controllers
                 return NotFound();
             }
 
+            var isAdmin = User.IsInRole(UserRoles.Admin);
+
+            var dto = new UserResponseDto
+            {
+                Id = user.Id,
+                Username = user.Username,
+                Email = isAdmin ? user.Email : string.Empty,
+                Role = user.Role,
+                CreatedAt = user.CreatedAt
+            };
+
+            return Ok(dto);
+        }
+
+        // GET: api/user/me
+        [HttpGet("me")]
+        [Authorize(Roles = $"{UserRoles.User},{UserRoles.Admin}")]
+        public async Task<ActionResult<UserResponseDto>> GetMe()
+        {
+            var userId = User.GetUserId();
+
+            var user = await _userService.GetUserByIdAsync(userId);
+            if (user == null)
+            {
+                return NotFound();
+            }
+
             var dto = new UserResponseDto
             {
                 Id = user.Id,
@@ -58,6 +90,100 @@ namespace MusicStreaming.API.Controllers
             };
 
             return Ok(dto);
+        }
+
+        // PUT: api/user/me/profile
+        [HttpPut("me/profile")]
+        [Authorize(Roles = $"{UserRoles.User},{UserRoles.Admin}")]
+        public async Task<ActionResult<UserResponseDto>> UpdateMyProfile([FromBody] UserProfileUpdateDto dto)
+        {
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ModelState);
+            }
+
+            var userId = User.GetUserId();
+
+            var updated = await _userService.UpdateUserProfileAsync(userId, dto.Bio, null);
+
+            var response = new UserResponseDto
+            {
+                Id = updated.Id,
+                Username = updated.Username,
+                Email = updated.Email,
+                Role = updated.Role,
+                CreatedAt = updated.CreatedAt
+            };
+
+            return Ok(response);
+        }
+
+        // GET: api/user/check-username?username=...
+        [HttpGet("check-username")]
+        [AllowAnonymous]
+        public async Task<ActionResult> CheckUsername([FromQuery] string username)
+        {
+            if (string.IsNullOrWhiteSpace(username))
+                return BadRequest(new { message = "Username is required." });
+
+            var taken = await _userService.IsUsernameTakenAsync(username);
+            return Ok(new { available = !taken });
+        }
+
+        // GET: api/user/check-email?email=...
+        [HttpGet("check-email")]
+        [AllowAnonymous]
+        public async Task<ActionResult> CheckEmail([FromQuery] string email)
+        {
+            if (string.IsNullOrWhiteSpace(email))
+                return BadRequest(new { message = "Email is required." });
+
+            var taken = await _userService.IsEmailTakenAsync(email);
+            return Ok(new { available = !taken });
+        }
+
+        // GET: api/user/search?query=...
+        [HttpGet("search")]
+        [Authorize(Roles = $"{UserRoles.User},{UserRoles.Admin}")]
+        public async Task<ActionResult<IEnumerable<UserResponseDto>>> Search([FromQuery] string query)
+        {
+            var users = await _userService.SearchUsersAsync(query);
+            var isAdmin = User.IsInRole(UserRoles.Admin);
+
+            var result = users.Select(u => new UserResponseDto
+            {
+                Id = u.Id,
+                Username = u.Username,
+                Email = isAdmin ? u.Email : string.Empty,
+                Role = u.Role,
+                CreatedAt = u.CreatedAt
+            });
+
+            return Ok(result);
+        }
+
+        // PUT: api/user/{id}/role
+        [HttpPut("{id:guid}/role")]
+        [Authorize(Roles = UserRoles.Admin)]
+        public async Task<ActionResult<UserResponseDto>> UpdateUserRole(Guid id, [FromBody] UpdateUserRoleRequestDto dto)
+        {
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ModelState);
+            }
+
+            var updated = await _userService.UpdateUserRoleAsync(id, dto.Role);
+
+            var response = new UserResponseDto
+            {
+                Id = updated.Id,
+                Username = updated.Username,
+                Email = updated.Email,
+                Role = updated.Role,
+                CreatedAt = updated.CreatedAt
+            };
+
+            return Ok(response);
         }
 
         // DELETE: api/user/{id}

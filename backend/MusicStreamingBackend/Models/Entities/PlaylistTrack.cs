@@ -13,7 +13,7 @@ namespace Models.Entities
         public Guid PlaylistId { get; set; }
         [Required]
         [MaxLength(20)]
-        public string SourceType { get; set; } = "LOCAL";
+        //public string SourceType { get; set; } = "LOCAL";
         public Guid? LocalTrackId { get; set; }
         public string? SpotifyTrackId { get; set; }
 
