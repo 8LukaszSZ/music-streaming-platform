@@ -71,14 +71,14 @@ namespace BL.Services
 
             return updatedUser;
         }
-        public async Task<User> UpdateUserProfileAsync(Guid userId, string? bio, byte[]? profileImage)
+        public async Task<User> UpdateUserProfileAsync(Guid userId, string? bio, string? profileImage)
         {
             var user = await _userRepository.GetByIdAsync(userId);
             if (user == null)
                 throw new InvalidOperationException("User not found.");
 
             user.Bio = bio ?? user.Bio;
-            user.ProfileImage = profileImage ?? user.ProfileImage;
+            user.ProfileImagePath = profileImage ?? user.ProfileImagePath;
 
             return await _userRepository.UpdateAsync(user);
         }

@@ -1,12 +1,12 @@
 using IBL;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.StaticFiles;
 using Models.Constants;
 using Models.DTOs.Tracks;
 using Models.Entities;
 using MusicStreaming.API.Extensions;
-using System.IdentityModel.Tokens.Jwt;
-using System.Security.Claims;
+using System.ComponentModel.DataAnnotations;
 
 namespace MusicStreaming.API.Controllers
 {
@@ -16,10 +16,17 @@ namespace MusicStreaming.API.Controllers
     public class LocalTracksController : ControllerBase
     {
         private readonly ILocalTrackService _localTrackService;
+        private readonly IFileStorageService _fileStorageService;
+        private readonly IWebHostEnvironment _env;
 
-        public LocalTracksController(ILocalTrackService localTrackService)
+        public LocalTracksController(
+            ILocalTrackService localTrackService,
+            IFileStorageService fileStorageService,
+            IWebHostEnvironment env)
         {
             _localTrackService = localTrackService;
+            _fileStorageService = fileStorageService;
+            _env = env;
         }
 
         // GET: api/localtracks/me
@@ -39,7 +46,9 @@ namespace MusicStreaming.API.Controllers
                 Duration = t.Duration,
                 Valence = t.Valence,
                 Energy = t.Energy,
-                UploadedAt = t.UploadedAt
+                UploadedAt = t.UploadedAt,
+                FilePath = t.FilePath,
+                TrackImagePath = t.TrackImagePath
             });
 
             return Ok(result);
@@ -54,7 +63,6 @@ namespace MusicStreaming.API.Controllers
             if (track == null)
                 return NotFound();
 
-            // Jeśli nie admin, sprawdź własność
             if (!User.IsInRole(UserRoles.Admin))
             {
                 var userId = User.GetUserId();
@@ -71,31 +79,71 @@ namespace MusicStreaming.API.Controllers
                 Duration = track.Duration,
                 Valence = track.Valence,
                 Energy = track.Energy,
-                UploadedAt = track.UploadedAt
+                UploadedAt = track.UploadedAt,
+                FilePath = track.FilePath,
+                TrackImagePath = track.TrackImagePath
             };
 
             return Ok(dto);
         }
 
+        // STREAM: api/localtracks/{id}/stream
+        [HttpGet("{id:guid}/stream")]
+        [Authorize(Roles = $"{UserRoles.User},{UserRoles.Admin}")]
+        public async Task<IActionResult> Stream(Guid id)
+        {
+            var track = await _localTrackService.GetLocalTrackByIdAsync(id);
+            if (track == null)
+                return NotFound();
+
+            if (!User.IsInRole(UserRoles.Admin))
+            {
+                var userId = User.GetUserId();
+                if (track.UserId != userId)
+                    return Forbid();
+            }
+
+            var fullPath = Path.Combine(_env.ContentRootPath, track.FilePath);
+
+            if (!System.IO.File.Exists(fullPath))
+                return NotFound("File not found");
+
+            var provider = new FileExtensionContentTypeProvider();
+            if (!provider.TryGetContentType(fullPath, out var contentType))
+                contentType = "application/octet-stream";
+
+            return PhysicalFile(fullPath, contentType, enableRangeProcessing: true);
+        }
+
         // POST: api/localtracks
         [HttpPost]
         [Authorize(Roles = $"{UserRoles.User},{UserRoles.Admin}")]
-        public async Task<ActionResult<LocalTrackResponseDto>> Create([FromBody] LocalTrackCreateDto dto)
+        public async Task<ActionResult<LocalTrackResponseDto>> Create([FromForm] LocalTrackCreateDto request)
         {
             if (!ModelState.IsValid)
                 return BadRequest(ModelState);
 
             var userId = User.GetUserId();
+            var trackId = Guid.NewGuid();
+
+            var filePath = await _fileStorageService.SaveTrackFileAsync(userId, trackId, request.File);
+
+            string? imagePath = null;
+            if (request.TrackImage != null)
+            {
+                imagePath = await _fileStorageService.SaveTrackImageAsync(userId, trackId, request.TrackImage);
+            }
 
             var track = new LocalTrack
             {
+                Id = trackId,
                 UserId = userId,
-                Title = dto.Title,
-                File = dto.File,
-                TrackImage = dto.TrackImage,
-                Duration = dto.Duration,
-                Valence = dto.Valence,
-                Energy = dto.Energy,
+                Title = request.Title,
+                FilePath = filePath,
+                TrackImagePath = imagePath,
+                Duration = request.Duration,
+                Valence = request.Valence,
+                Energy = request.Energy,
                 UploadedAt = DateTime.UtcNow
             };
 
@@ -118,7 +166,7 @@ namespace MusicStreaming.API.Controllers
         // PUT: api/localtracks/{id}
         [HttpPut("{id:guid}")]
         [Authorize(Roles = $"{UserRoles.User},{UserRoles.Admin}")]
-        public async Task<ActionResult<LocalTrackResponseDto>> Update(Guid id, [FromBody] LocalTrackUpdateDto dto)
+        public async Task<ActionResult<LocalTrackResponseDto>> Update(Guid id, [FromForm] LocalTrackUpdateDto request)
         {
             if (!ModelState.IsValid)
                 return BadRequest(ModelState);
@@ -135,11 +183,15 @@ namespace MusicStreaming.API.Controllers
                     return Forbid();
             }
 
-            track.Title = dto.Title;
-            if (dto.TrackImage != null)
-                track.TrackImage = dto.TrackImage;
-            track.Valence = dto.Valence;
-            track.Energy = dto.Energy;
+            track.Title = request.Title;
+            track.Valence = request.Valence;
+            track.Energy = request.Energy;
+
+            if (request.TrackImage != null)
+            {
+                var imagePath = await _fileStorageService.SaveTrackImageAsync(track.UserId, track.Id, request.TrackImage);
+                track.TrackImagePath = imagePath;
+            }
 
             var updated = await _localTrackService.UpdateLocalTrackAsync(track);
 
@@ -151,7 +203,9 @@ namespace MusicStreaming.API.Controllers
                 Duration = updated.Duration,
                 Valence = updated.Valence,
                 Energy = updated.Energy,
-                UploadedAt = updated.UploadedAt
+                UploadedAt = updated.UploadedAt,
+                FilePath = updated.FilePath,
+                TrackImagePath = updated.TrackImagePath
             };
 
             return Ok(response);

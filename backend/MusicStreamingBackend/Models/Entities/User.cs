@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
@@ -25,7 +25,7 @@ namespace Models.Entities
         [Required]
         [MaxLength(50)]
         public string Role { get; set; } = string.Empty;
-        public byte[]? ProfileImage { get; set; }
+        public string? ProfileImagePath { get; set; }
         [MaxLength(500)]
         public string? Bio { get; set; }
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;

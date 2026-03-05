@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Http;
 using System;
 using System.ComponentModel.DataAnnotations;
 
@@ -11,6 +12,7 @@ namespace Models.DTOs.Playlists
         public string? Description { get; set; }
         public bool IsPublic { get; set; }
         public DateTime CreatedAt { get; set; }
+        public string? PlaylistImagePath { get; set; }
     }
 
     public class PlaylistCreateDto
@@ -23,6 +25,7 @@ namespace Models.DTOs.Playlists
         public string? Description { get; set; }
 
         public bool IsPublic { get; set; } = false;
+        public IFormFile? PlaylistImage { get; set; }
     }
 
     public class PlaylistUpdateDto
@@ -33,6 +36,7 @@ namespace Models.DTOs.Playlists
 
         [MaxLength(1000)]
         public string? Description { get; set; }
+        public IFormFile? PlaylistImage { get; set; }
     }
 
     public class PlaylistVisibilityUpdateDto

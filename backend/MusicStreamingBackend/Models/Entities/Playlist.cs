@@ -14,7 +14,7 @@ namespace Models.Entities
         [Required]
         [MaxLength(255)]
         public string Name { get; set; } = string.Empty;
-        public byte[]? PlaylistImage { get; set; }
+        public string? PlaylistImagePath { get; set; }
         [MaxLength(1000)]
         public string? Description { get; set; }
         [Required]

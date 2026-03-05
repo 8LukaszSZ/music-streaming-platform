@@ -10,3 +10,8 @@ obj/
 # NuGet
 *.nupkg
 packages/
+
+UploadedImagesUser/
+UploadedImagesTracks/
+UploadedImagesPlaylist/
+UploadedMusic/

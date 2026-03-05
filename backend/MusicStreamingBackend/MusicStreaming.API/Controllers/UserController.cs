@@ -1,9 +1,11 @@
+using BL.Services;
 using IBL;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Models.Constants;
 using Models.DTOs.Auth;
 using Models.DTOs.User;
+using Models.Entities;
 using MusicStreaming.API.Extensions;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
@@ -16,10 +18,13 @@ namespace MusicStreaming.API.Controllers
     public class UserController : ControllerBase
     {
         private readonly IUserService _userService;
+        private readonly IFileStorageService _fileStorageService;
 
-        public UserController(IUserService userService)
+        public UserController(IUserService userService, IFileStorageService fileStorageService)
         {
             _userService = userService;
+            _fileStorageService = fileStorageService;
+
         }
 
         // GET: api/user
@@ -36,7 +41,8 @@ namespace MusicStreaming.API.Controllers
                 Username = u.Username,
                 Email = u.Email,
                 Role = u.Role,
-                CreatedAt = u.CreatedAt
+                CreatedAt = u.CreatedAt,
+                ProfileImagePath = u.ProfileImagePath
             });
 
             return Ok(result);
@@ -61,7 +67,8 @@ namespace MusicStreaming.API.Controllers
                 Username = user.Username,
                 Email = isAdmin ? user.Email : string.Empty,
                 Role = user.Role,
-                CreatedAt = user.CreatedAt
+                CreatedAt = user.CreatedAt,
+                ProfileImagePath = user.ProfileImagePath
             };
 
             return Ok(dto);
@@ -86,7 +93,9 @@ namespace MusicStreaming.API.Controllers
                 Username = user.Username,
                 Email = user.Email,
                 Role = user.Role,
-                CreatedAt = user.CreatedAt
+                CreatedAt = user.CreatedAt,
+                ProfileImagePath = user.ProfileImagePath
+
             };
 
             return Ok(dto);
@@ -95,7 +104,7 @@ namespace MusicStreaming.API.Controllers
         // PUT: api/user/me/profile
         [HttpPut("me/profile")]
         [Authorize(Roles = $"{UserRoles.User},{UserRoles.Admin}")]
-        public async Task<ActionResult<UserResponseDto>> UpdateMyProfile([FromBody] UserProfileUpdateDto dto)
+        public async Task<ActionResult<UserResponseDto>> UpdateMyProfile([FromForm] UserProfileUpdateDto dto)
         {
             if (!ModelState.IsValid)
             {
@@ -104,7 +113,13 @@ namespace MusicStreaming.API.Controllers
 
             var userId = User.GetUserId();
 
-            var updated = await _userService.UpdateUserProfileAsync(userId, dto.Bio, null);
+            string? imagePath = null;
+            if (dto.ProfileImage != null)
+            {
+                imagePath = await _fileStorageService.SaveUserImageAsync(userId, dto.ProfileImage);
+            }
+
+            var updated = await _userService.UpdateUserProfileAsync(userId, dto.Bio, imagePath);
 
             var response = new UserResponseDto
             {
@@ -112,7 +127,8 @@ namespace MusicStreaming.API.Controllers
                 Username = updated.Username,
                 Email = updated.Email,
                 Role = updated.Role,
-                CreatedAt = updated.CreatedAt
+                CreatedAt = updated.CreatedAt,
+                ProfileImagePath = updated.ProfileImagePath
             };
 
             return Ok(response);
@@ -156,7 +172,8 @@ namespace MusicStreaming.API.Controllers
                 Username = u.Username,
                 Email = isAdmin ? u.Email : string.Empty,
                 Role = u.Role,
-                CreatedAt = u.CreatedAt
+                CreatedAt = u.CreatedAt,
+                ProfileImagePath = u.ProfileImagePath
             });
 
             return Ok(result);
@@ -180,7 +197,8 @@ namespace MusicStreaming.API.Controllers
                 Username = updated.Username,
                 Email = updated.Email,
                 Role = updated.Role,
-                CreatedAt = updated.CreatedAt
+                CreatedAt = updated.CreatedAt,
+                ProfileImagePath = updated.ProfileImagePath
             };
 
             return Ok(response);

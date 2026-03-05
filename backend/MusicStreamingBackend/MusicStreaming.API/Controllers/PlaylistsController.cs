@@ -1,5 +1,6 @@
 using IBL;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using Models.Constants;
 using Models.DTOs.Playlists;
@@ -16,10 +17,12 @@ namespace MusicStreaming.API.Controllers
     public class PlaylistsController : ControllerBase
     {
         private readonly IPlaylistService _playlistService;
+        private readonly IFileStorageService _fileStorageService;
 
-        public PlaylistsController(IPlaylistService playlistService)
+        public PlaylistsController(IPlaylistService playlistService, IFileStorageService fileStorageService)
         {
             _playlistService = playlistService;
+            _fileStorageService = fileStorageService;
         }
 
         // GET: api/playlists/me
@@ -38,7 +41,8 @@ namespace MusicStreaming.API.Controllers
                 Name = p.Name,
                 Description = p.Description,
                 IsPublic = p.IsPublic,
-                CreatedAt = p.CreatedAt
+                CreatedAt = p.CreatedAt,
+                PlaylistImagePath = p.PlaylistImagePath
             });
 
             return Ok(result);
@@ -58,7 +62,8 @@ namespace MusicStreaming.API.Controllers
                 Name = p.Name,
                 Description = p.Description,
                 IsPublic = p.IsPublic,
-                CreatedAt = p.CreatedAt
+                CreatedAt = p.CreatedAt,
+                PlaylistImagePath = p.PlaylistImagePath
             });
 
             return Ok(result);
@@ -88,7 +93,8 @@ namespace MusicStreaming.API.Controllers
                 Name = playlist.Name,
                 Description = playlist.Description,
                 IsPublic = playlist.IsPublic,
-                CreatedAt = playlist.CreatedAt
+                CreatedAt = playlist.CreatedAt,
+                PlaylistImagePath = playlist.PlaylistImagePath
             };
 
             return Ok(dto);
@@ -97,17 +103,26 @@ namespace MusicStreaming.API.Controllers
         // POST: api/playlists
         [HttpPost]
         [Authorize(Roles = $"{UserRoles.User},{UserRoles.Admin}")]
-        public async Task<ActionResult<PlaylistResponseDto>> Create([FromBody] PlaylistCreateDto dto)
+        public async Task<ActionResult<PlaylistResponseDto>> Create([FromForm] PlaylistCreateDto dto)
         {
             if (!ModelState.IsValid)
                 return BadRequest(ModelState);
 
             var userId = User.GetUserId();
+            var playlistId = Guid.NewGuid();
+
+            string? imagePath = null;
+            if (dto.PlaylistImage != null)
+            {
+                imagePath = await _fileStorageService.SavePlaylistImageAsync(userId, playlistId, dto.PlaylistImage);
+            }
 
             var playlist = new Playlist
             {
+                Id = playlistId,
                 UserId = userId,
                 Name = dto.Name,
+                PlaylistImagePath = imagePath,
                 Description = dto.Description,
                 IsPublic = dto.IsPublic,
                 CreatedAt = DateTime.UtcNow
@@ -122,7 +137,8 @@ namespace MusicStreaming.API.Controllers
                 Name = created.Name,
                 Description = created.Description,
                 IsPublic = created.IsPublic,
-                CreatedAt = created.CreatedAt
+                CreatedAt = created.CreatedAt,
+                PlaylistImagePath = created.PlaylistImagePath
             };
 
             return CreatedAtAction(nameof(GetById), new { id = created.Id }, response);
@@ -131,7 +147,7 @@ namespace MusicStreaming.API.Controllers
         // PUT: api/playlists/{id}
         [HttpPut("{id:guid}")]
         [Authorize(Roles = $"{UserRoles.User},{UserRoles.Admin}")]
-        public async Task<ActionResult<PlaylistResponseDto>> Update(Guid id, [FromBody] PlaylistUpdateDto dto)
+        public async Task<ActionResult<PlaylistResponseDto>> Update(Guid id, [FromForm] PlaylistUpdateDto dto)
         {
             if (!ModelState.IsValid)
                 return BadRequest(ModelState);
@@ -151,6 +167,12 @@ namespace MusicStreaming.API.Controllers
             playlist.Name = dto.Name;
             playlist.Description = dto.Description;
 
+            if (dto.PlaylistImage != null)
+            {
+                var imagePath = await _fileStorageService.SavePlaylistImageAsync(playlist.UserId, playlist.Id, dto.PlaylistImage);
+                playlist.PlaylistImagePath = imagePath;
+            }
+
             var updated = await _playlistService.UpdatePlaylistAsync(playlist);
 
             var response = new PlaylistResponseDto
@@ -160,7 +182,8 @@ namespace MusicStreaming.API.Controllers
                 Name = updated.Name,
                 Description = updated.Description,
                 IsPublic = updated.IsPublic,
-                CreatedAt = updated.CreatedAt
+                CreatedAt = updated.CreatedAt,
+                PlaylistImagePath = updated.PlaylistImagePath
             };
 
             return Ok(response);

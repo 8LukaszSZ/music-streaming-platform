@@ -15,8 +15,8 @@ namespace Models.Entities
         [MaxLength(255)]
         public string Title { get; set; } = string.Empty;
         [Required]
-        public byte[] File { get; set; } = Array.Empty<byte>();
-        public byte[]? TrackImage { get; set; }
+        public string FilePath { get; set; } = string.Empty;
+        public string? TrackImagePath { get; set; }
         [Required]
         public int Duration { get; set; }
         [Range(0, 1)]
