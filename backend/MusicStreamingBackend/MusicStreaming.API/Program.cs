@@ -12,10 +12,17 @@ using Microsoft.IdentityModel.Tokens;
 using Models.Entities;
 using System.Text;
 using Microsoft.OpenApi.Models;
+using MusicStreaming.API.Hubs;
+using System.Text.Json.Serialization;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddControllers();
+builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+    {
+        options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
+    });
+builder.Services.AddSignalR();
 
 builder.Services.AddDbContext<MusicStreamingContext>(options =>
     options.UseNpgsql(
@@ -28,7 +35,6 @@ builder.Services.AddScoped<IPlaylistRepository, PlaylistRepository>();
 builder.Services.AddScoped<IPlaylistTrackRepository, PlaylistTrackRepository>();
 builder.Services.AddScoped<IUserFollowsRepository, UserFollowsRepository>();
 builder.Services.AddScoped<IContentLikeRepository, ContentLikeRepository>();
-builder.Services.AddScoped<IContentShareRepository, ContentShareRepository>();
 builder.Services.AddScoped<IContentCommentRepository, ContentCommentRepository>();
 builder.Services.AddScoped<IContentStatRepository, ContentStatRepository>();
 builder.Services.AddScoped<IContentPlayRepository, ContentPlayRepository>();
@@ -42,7 +48,6 @@ builder.Services.AddScoped<IPlaylistService, PlaylistService>();
 builder.Services.AddScoped<IPlaylistTrackService, PlaylistTrackService>();
 builder.Services.AddScoped<IUserFollowsService, UserFollowsService>();
 builder.Services.AddScoped<IContentLikeService, ContentLikeService>();
-builder.Services.AddScoped<IContentShareService, ContentShareService>();
 builder.Services.AddScoped<IContentCommentService, ContentCommentService>();
 builder.Services.AddScoped<IContentStatService, ContentStatService>();
 builder.Services.AddScoped<IContentPlayService, ContentPlayService>();
@@ -83,6 +88,23 @@ builder.Services.AddAuthentication(options =>
         ValidAudience = jwtOptions.Audience,
         IssuerSigningKey = signingKey,
         RoleClaimType = System.Security.Claims.ClaimTypes.Role
+    };
+
+    // Enable JWT auth for SignalR (WebSockets/SSE) where the token is commonly sent as a query string.
+    options.Events = new JwtBearerEvents
+    {
+        OnMessageReceived = context =>
+        {
+            var accessToken = context.Request.Query["access_token"];
+            var path = context.HttpContext.Request.Path;
+
+            if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/hubs/chat"))
+            {
+                context.Token = accessToken;
+            }
+
+            return Task.CompletedTask;
+        }
     };
 });
 
@@ -140,5 +162,6 @@ app.UseAuthentication();
 app.UseAuthorization();
 app.UseStaticFiles();
 app.MapControllers();
+app.MapHub<ChatHub>("/hubs/chat");
 
 app.Run();

@@ -18,7 +18,6 @@ namespace DAL.Context
         public DbSet<PlaylistTrack> PlaylistTracks => Set<PlaylistTrack>();
         public DbSet<UserFollows> UserFollows => Set<UserFollows>();
         public DbSet<ContentLike> ContentLikes => Set<ContentLike>();
-        public DbSet<ContentShare> ContentShares => Set<ContentShare>();
         public DbSet<ContentComment> ContentComments => Set<ContentComment>();
         public DbSet<ContentStat> ContentStats => Set<ContentStat>();
         public DbSet<ContentPlay> ContentPlays => Set<ContentPlay>();
@@ -63,21 +62,6 @@ namespace DAL.Context
             modelBuilder.Entity<ContentLike>()
                 .HasIndex(cl => new { cl.UserId, cl.ContentId, cl.ContentType })
                 .IsUnique();
-
-            modelBuilder.Entity<ContentShare>()
-                .HasOne(cs => cs.Sharer)
-                .WithMany(u => u.ContentSharesSent)
-                .HasForeignKey(cs => cs.SharerId)
-                .OnDelete(DeleteBehavior.Restrict);
-
-            modelBuilder.Entity<ContentShare>()
-                .HasOne(cs => cs.SharedToUser)
-                .WithMany(u => u.ContentSharesReceived)
-                .HasForeignKey(cs => cs.SharedToUserId)
-                .OnDelete(DeleteBehavior.SetNull);
-
-            modelBuilder.Entity<ContentShare>()
-                .HasIndex(cs => new { cs.ContentId, cs.ContentType });
 
             modelBuilder.Entity<ContentComment>()
                 .HasOne(cc => cc.User)

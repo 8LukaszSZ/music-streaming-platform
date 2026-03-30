@@ -35,6 +35,15 @@ namespace BL.Services
                 .AnyAsync(cl => cl.UserId == userId && cl.ContentId == contentId && cl.ContentType == contentType);
         }
 
+        public async Task<List<ContentLike>> GetLikesForContentAsync(Guid contentId, string contentType)
+        {
+            return await _likeRepository.GetContentLikes()
+                .Where(cl => cl.ContentId == contentId && cl.ContentType == contentType)
+                .OrderByDescending(cl => cl.CreatedAt)
+                .Include(cl => cl.User)
+                .ToListAsync();
+        }
+
         public async Task<List<ContentLike>> GetLikedContentByUserAsync(Guid userId, string contentType)
         {
             return await _likeRepository.GetContentLikes()
@@ -45,7 +54,7 @@ namespace BL.Services
 
         public async Task<List<LocalTrack>> GetLikedTracksByUserAsync(Guid userId)
         {
-            var likes = await GetLikedContentByUserAsync(userId, ContentTypes.TRACK);
+            var likes = await GetLikedContentByUserAsync(userId, nameof(ContentType.TRACK));
             if (likes.Count == 0)
                 return new List<LocalTrack>();
 

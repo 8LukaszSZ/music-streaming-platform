@@ -1,6 +1,7 @@
 using IBL;
 using IDAL;
 using Microsoft.EntityFrameworkCore;
+using Models.Constants;
 using Models.Entities;
 using System;
 using System.Collections.Generic;
@@ -59,6 +60,22 @@ namespace BL.Services
 
             if (message.SenderId != conversation.ParticipantAId && message.SenderId != conversation.ParticipantBId)
                 throw new InvalidOperationException("Sender is not a participant of this conversation.");
+
+            if (!string.IsNullOrWhiteSpace(message.SharedContentType))
+            {
+                var normalizedType = message.SharedContentType.Trim().ToUpperInvariant();
+                if (normalizedType != nameof(ContentType.TRACK) && normalizedType != nameof(ContentType.PLAYLIST))
+                    throw new InvalidOperationException("SharedContentType must be TRACK or PLAYLIST.");
+
+                if (!message.SharedContentId.HasValue)
+                    throw new InvalidOperationException("SharedContentId is required when SharedContentType is provided.");
+
+                message.SharedContentType = normalizedType;
+            }
+            else if (message.SharedContentId.HasValue)
+            {
+                throw new InvalidOperationException("SharedContentType is required when SharedContentId is provided.");
+            }
 
             if (message.Id == Guid.Empty)
                 message.Id = Guid.NewGuid();

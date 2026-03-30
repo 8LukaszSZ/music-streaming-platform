@@ -35,8 +35,6 @@ namespace Models.Entities
         public ICollection<UserFollows> Followers { get; set; } = new List<UserFollows>();
         public ICollection<UserFollows> Following { get; set; } = new List<UserFollows>();
         public ICollection<ContentLike> ContentLikes { get; set; } = new List<ContentLike>();
-        public ICollection<ContentShare> ContentSharesSent { get; set; } = new List<ContentShare>();
-        public ICollection<ContentShare> ContentSharesReceived { get; set; } = new List<ContentShare>();
         public ICollection<ContentComment> ContentComments { get; set; } = new List<ContentComment>();
         public ICollection<UserActivity> UserActivities { get; set; } = new List<UserActivity>();
         public ICollection<Conversation> ConversationsAsA { get; set; } = new List<Conversation>();

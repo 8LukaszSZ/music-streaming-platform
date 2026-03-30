@@ -1,4 +1,5 @@
 using Models.Entities;
+using Models.Constants;
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
@@ -14,9 +15,9 @@ namespace IBL
 
         Task<UserActivity> AddActivityAsync(
             Guid userId,
-            string activityType,
+            ActivityType activityType,
             Guid contentId,
-            string contentType,
+            ContentType contentType,
             string? message
         );
 

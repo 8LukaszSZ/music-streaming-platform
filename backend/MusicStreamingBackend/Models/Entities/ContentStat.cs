@@ -1,7 +1,7 @@
 using System;
+using Models.Constants;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
-using Models.Constants;
 
 namespace Models.Entities
 {
@@ -16,7 +16,7 @@ namespace Models.Entities
         
         [Required]
         [MaxLength(20)]
-        public string ContentType { get; set; } = ContentTypes.TRACK;
+        public string ContentType { get; set; } = nameof(Constants.ContentType.TRACK);
 
         [Range(0, long.MaxValue)]
         public long LikesCount { get; set; } = 0;

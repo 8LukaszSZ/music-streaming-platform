@@ -10,6 +10,7 @@ namespace IBL
         Task<int> GetLikeCountAsync(Guid contentId, string contentType);
         Task<bool> IsContentLikedByUserAsync(Guid userId, Guid contentId, string contentType);
 
+        Task<List<ContentLike>> GetLikesForContentAsync(Guid contentId, string contentType);
         Task<List<ContentLike>> GetLikedContentByUserAsync(Guid userId, string contentType);
         Task<List<LocalTrack>> GetLikedTracksByUserAsync(Guid userId);
 

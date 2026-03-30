@@ -1,7 +1,7 @@
 namespace Models.Constants
 {
-    public static class ActivityTypes
+    public enum ActivityType
     {
-        public const string SHARE = "SHARE";
+        SHARE
     }
 }

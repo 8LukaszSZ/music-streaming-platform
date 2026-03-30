@@ -1,6 +1,7 @@
 using IBL;
 using IDAL;
 using Microsoft.EntityFrameworkCore;
+using Models.Constants;
 using Models.Entities;
 using System;
 using System.Collections.Generic;
@@ -54,18 +55,18 @@ namespace BL.Services
 
         public async Task<UserActivity> AddActivityAsync(
             Guid userId,
-            string activityType,
+            ActivityType activityType,
             Guid contentId,
-            string contentType,
+            ContentType contentType,
             string? message)
         {
             var activity = new UserActivity
             {
                 Id = Guid.NewGuid(),
                 UserId = userId,
-                ActivityType = activityType,
+                ActivityType = activityType.ToString(),
                 ContentId = contentId,
-                ContentType = contentType,
+                ContentType = contentType.ToString(),
                 Message = message,
                 CreatedAt = DateTime.UtcNow
             };
