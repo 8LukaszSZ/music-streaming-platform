@@ -7,8 +7,6 @@ using Models.DTOs.Auth;
 using Models.DTOs.User;
 using Models.Entities;
 using MusicStreaming.API.Extensions;
-using System.IdentityModel.Tokens.Jwt;
-using System.Security.Claims;
 
 namespace MusicStreaming.API.Controllers
 {
@@ -38,11 +36,11 @@ namespace MusicStreaming.API.Controllers
             var result = users.Select(u => new UserResponseDto
             {
                 Id = u.Id,
-                Username = u.Username,
+                Username = u.DisplayUsername(),
                 Email = u.Email,
                 Role = u.Role,
                 CreatedAt = u.CreatedAt,
-                ProfileImagePath = u.ProfileImagePath
+                ProfileImagePath = u.DisplayProfileImagePath()
             });
 
             return Ok(result);
@@ -50,7 +48,7 @@ namespace MusicStreaming.API.Controllers
 
         // GET: api/user/{id}
         [HttpGet("{id:guid}")]
-        [Authorize(Roles = $"{UserRoles.User},{UserRoles.Admin}")]
+        [AllowAnonymous]
         public async Task<ActionResult<UserResponseDto>> GetById(Guid id)
         {
             var user = await _userService.GetUserByIdAsync(id);
@@ -64,11 +62,11 @@ namespace MusicStreaming.API.Controllers
             var dto = new UserResponseDto
             {
                 Id = user.Id,
-                Username = user.Username,
+                Username = user.DisplayUsername(),
                 Email = isAdmin ? user.Email : string.Empty,
                 Role = user.Role,
                 CreatedAt = user.CreatedAt,
-                ProfileImagePath = user.ProfileImagePath
+                ProfileImagePath = user.DisplayProfileImagePath()
             };
 
             return Ok(dto);
@@ -86,6 +84,10 @@ namespace MusicStreaming.API.Controllers
             {
                 return NotFound();
             }
+            if (user.IsDeleted)
+            {
+                return NotFound();
+            }
 
             var dto = new UserResponseDto
             {
@@ -94,7 +96,7 @@ namespace MusicStreaming.API.Controllers
                 Email = user.Email,
                 Role = user.Role,
                 CreatedAt = user.CreatedAt,
-                ProfileImagePath = user.ProfileImagePath
+                ProfileImagePath = user.DisplayProfileImagePath()
 
             };
 
@@ -124,11 +126,11 @@ namespace MusicStreaming.API.Controllers
             var response = new UserResponseDto
             {
                 Id = updated.Id,
-                Username = updated.Username,
+                Username = updated.DisplayUsername(),
                 Email = updated.Email,
                 Role = updated.Role,
                 CreatedAt = updated.CreatedAt,
-                ProfileImagePath = updated.ProfileImagePath
+                ProfileImagePath = updated.DisplayProfileImagePath()
             };
 
             return Ok(response);
@@ -160,7 +162,8 @@ namespace MusicStreaming.API.Controllers
 
         // GET: api/user/search?query=...
         [HttpGet("search")]
-        [Authorize(Roles = $"{UserRoles.User},{UserRoles.Admin}")]
+        //[Authorize(Roles = $"{UserRoles.User},{UserRoles.Admin}")]
+        [AllowAnonymous]
         public async Task<ActionResult<IEnumerable<UserResponseDto>>> Search([FromQuery] string query)
         {
             var users = await _userService.SearchUsersAsync(query);
@@ -169,11 +172,11 @@ namespace MusicStreaming.API.Controllers
             var result = users.Select(u => new UserResponseDto
             {
                 Id = u.Id,
-                Username = u.Username,
+                Username = u.DisplayUsername(),
                 Email = isAdmin ? u.Email : string.Empty,
                 Role = u.Role,
                 CreatedAt = u.CreatedAt,
-                ProfileImagePath = u.ProfileImagePath
+                ProfileImagePath = u.DisplayProfileImagePath()
             });
 
             return Ok(result);
@@ -194,11 +197,11 @@ namespace MusicStreaming.API.Controllers
             var response = new UserResponseDto
             {
                 Id = updated.Id,
-                Username = updated.Username,
+                Username = updated.DisplayUsername(),
                 Email = updated.Email,
                 Role = updated.Role,
                 CreatedAt = updated.CreatedAt,
-                ProfileImagePath = updated.ProfileImagePath
+                ProfileImagePath = updated.DisplayProfileImagePath()
             };
 
             return Ok(response);

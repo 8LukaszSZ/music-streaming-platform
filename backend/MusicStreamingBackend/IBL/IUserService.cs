@@ -18,7 +18,7 @@ namespace IBL
 
         Task<User> AddUserAsync(User user);
         Task<User> UpdateUserAsync(User user);
-        Task<User> UpdateUserProfileAsync(Guid userId, string? bio, string profileImage);
+        Task<User> UpdateUserProfileAsync(Guid userId, string? bio, string? profileImage);
         Task<User?> DeleteUserAsync(Guid userId);
 
         Task<bool> IsEmailTakenAsync(string email);

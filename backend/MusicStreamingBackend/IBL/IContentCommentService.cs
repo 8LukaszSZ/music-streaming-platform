@@ -1,4 +1,4 @@
-﻿using Models.Entities;
+using Models.Entities;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -10,6 +10,7 @@ namespace IBL
     public interface IContentCommentService
     {
         Task<int> GetCommentCountAsync(Guid contentId, string contentType);
+        Task<int> GetCommentCountAsync(Guid contentId, string contentType, DateTime fromDate);
 
         Task<List<ContentComment>> GetCommentsForContentAsync(Guid contentId, string contentType);
 

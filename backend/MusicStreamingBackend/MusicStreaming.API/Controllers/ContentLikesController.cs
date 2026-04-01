@@ -40,8 +40,8 @@ namespace MusicStreaming.API.Controllers
                 .Select(l => new UserLiteDto
                 {
                     Id = l.User.Id,
-                    Username = l.User.Username,
-                    ProfileImagePath = l.User.ProfileImagePath
+                    Username = l.User.DisplayUsername(),
+                    ProfileImagePath = l.User.DisplayProfileImagePath()
                 });
 
             return Ok(users);
@@ -66,16 +66,8 @@ namespace MusicStreaming.API.Controllers
                 return BadRequest(ModelState);
 
             var userId = User.GetUserId();
-
-            try
-            {
-                await _contentLikeService.LikeContentAsync(userId, dto.ContentId, dto.ContentType.ToString());
-                return NoContent();
-            }
-            catch (InvalidOperationException ex)
-            {
-                return BadRequest(ex.Message);
-            }
+            await _contentLikeService.LikeContentAsync(userId, dto.ContentId, dto.ContentType.ToString());
+            return NoContent();
         }
 
         // DELETE: api/contentlikes

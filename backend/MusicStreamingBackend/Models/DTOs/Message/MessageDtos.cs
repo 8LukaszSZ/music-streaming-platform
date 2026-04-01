@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using System.ComponentModel.DataAnnotations;
 
 using Models.Constants;
 
@@ -25,8 +26,14 @@ namespace Models.DTOs.Message
 
     public class SendMessageDto
     {
+        [Required]
         public Guid ConversationId { get; set; }
+
+        [Required]
+        [MinLength(1)]
+        [MaxLength(2000)]
         public string Content { get; set; } = string.Empty;
+
         public Guid? SharedContentId { get; set; }
         public ContentType? SharedContentType { get; set; }
     }

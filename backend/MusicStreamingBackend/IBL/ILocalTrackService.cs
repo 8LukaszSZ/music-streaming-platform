@@ -1,4 +1,4 @@
-﻿using Models.Entities;
+using Models.Entities;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -13,6 +13,7 @@ namespace IBL
         Task<List<LocalTrack>> GetAllLocalTracksAsync();
         Task<List<LocalTrack>> GetLocalTracksByUserIdAsync(Guid userId);
         Task<LocalTrack?> GetLocalTrackByIdAsync(Guid localTrackId);
+        Task<List<LocalTrack>> SearchTracksAsync(string query, Guid? viewerUserId, bool isAdmin);
 
         Task<LocalTrack> AddLocalTrackAsync(LocalTrack localTrack);
         Task<LocalTrack> UpdateLocalTrackAsync(LocalTrack localTrack);

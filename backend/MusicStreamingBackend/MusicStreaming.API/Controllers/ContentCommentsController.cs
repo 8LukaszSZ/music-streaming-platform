@@ -48,28 +48,20 @@ namespace MusicStreaming.API.Controllers
                 return BadRequest(ModelState);
 
             var userId = User.GetUserId();
+            var created = await _contentCommentService.AddCommentAsync(
+                userId,
+                dto.ContentId,
+                dto.ContentType.ToString(),
+                dto.Content,
+                dto.ParentCommentId
+            );
 
-            try
-            {
-                var created = await _contentCommentService.AddCommentAsync(
-                    userId,
-                    dto.ContentId,
-                    dto.ContentType.ToString(),
-                    dto.Content,
-                    dto.ParentCommentId
-                );
+            // Ensure navigation properties for response
+            var createdFull = await _contentCommentService.GetCommentByIdAsync(created.Id);
+            if (createdFull == null)
+                return Ok(MapComment(created));
 
-                // Ensure navigation properties for response
-                var createdFull = await _contentCommentService.GetCommentByIdAsync(created.Id);
-                if (createdFull == null)
-                    return Ok(MapComment(created));
-
-                return Ok(MapComment(createdFull));
-            }
-            catch (InvalidOperationException ex)
-            {
-                return BadRequest(ex.Message);
-            }
+            return Ok(MapComment(createdFull));
         }
 
         // PUT: api/contentcomments/{id}
@@ -131,8 +123,8 @@ namespace MusicStreaming.API.Controllers
                 User = new UserLiteDto
                 {
                     Id = comment.UserId,
-                    Username = comment.User?.Username ?? string.Empty,
-                    ProfileImagePath = comment.User?.ProfileImagePath
+                    Username = comment.User.DisplayUsername(),
+                    ProfileImagePath = comment.User.DisplayProfileImagePath()
                 },
                 Replies = comment.Replies?.Select(MapComment).ToList() ?? new List<ContentCommentResponseDto>()
             };

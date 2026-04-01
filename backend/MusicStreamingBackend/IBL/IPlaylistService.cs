@@ -1,4 +1,4 @@
-﻿using Models.Entities;
+using Models.Entities;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -13,6 +13,7 @@ namespace IBL
         Task<List<Playlist>> GetAllPlaylistsAsync();
         Task<List<Playlist>> GetPlaylistsByUserIdAsync(Guid userId);
         Task<List<Playlist>> GetPublicPlaylistsAsync();
+        Task<List<Playlist>> SearchPlaylistsByNameAsync(string query, Guid? viewerUserId, bool isAdmin);
         Task<Playlist?> GetPlaylistByIdAsync(Guid playlistId);
 
         Task<Playlist> AddPlaylistAsync(Playlist playlist);

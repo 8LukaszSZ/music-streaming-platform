@@ -10,10 +10,20 @@ namespace BL.Services
     public class ContentStatService : IContentStatService
     {
         private readonly IContentStatRepository _statRepository;
+        private readonly IContentLikeRepository _likeRepository;
+        private readonly IContentCommentRepository _commentRepository;
+        private readonly IContentPlayRepository _playRepository;
 
-        public ContentStatService(IContentStatRepository statRepository)
+        public ContentStatService(
+            IContentStatRepository statRepository,
+            IContentLikeRepository likeRepository,
+            IContentCommentRepository commentRepository,
+            IContentPlayRepository playRepository)
         {
             _statRepository = statRepository;
+            _likeRepository = likeRepository;
+            _commentRepository = commentRepository;
+            _playRepository = playRepository;
         }
 
         public async Task<ContentStat> GetOrCreateAsync(Guid contentId, string contentType)
@@ -36,6 +46,29 @@ namespace BL.Services
             };
 
             return await _statRepository.AddAsync(stat);
+        }
+
+        public async Task<ContentStat> GetFromDateAsync(Guid contentId, string contentType, DateTime fromDate)
+        {
+            var likesCount = await _likeRepository.GetContentLikes()
+                .LongCountAsync(cl => cl.ContentId == contentId && cl.ContentType == contentType && cl.CreatedAt >= fromDate);
+
+            var commentsCount = await _commentRepository.GetContentComments()
+                .LongCountAsync(cc => cc.ContentId == contentId && cc.ContentType == contentType && cc.CreatedAt >= fromDate);
+
+            var playsCount = await _playRepository.GetContentPlays()
+                .LongCountAsync(cp => cp.ContentId == contentId && cp.ContentType == contentType && cp.PlayedAt >= fromDate);
+
+            return new ContentStat
+            {
+                Id = Guid.NewGuid(),
+                ContentId = contentId,
+                ContentType = contentType,
+                LikesCount = likesCount,
+                CommentsCount = commentsCount,
+                PlaysCount = playsCount,
+                LastUpdated = DateTime.UtcNow
+            };
         }
 
         public async Task IncrementLikesAsync(Guid contentId, string contentType)

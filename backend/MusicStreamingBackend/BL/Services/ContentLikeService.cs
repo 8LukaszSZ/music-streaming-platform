@@ -29,6 +29,12 @@ namespace BL.Services
                 .CountAsync(cl => cl.ContentId == contentId && cl.ContentType == contentType);
         }
 
+        public Task<int> GetLikeCountAsync(Guid contentId, string contentType, DateTime fromDate)
+        {
+            return _likeRepository.GetContentLikes()
+                .CountAsync(cl => cl.ContentId == contentId && cl.ContentType == contentType && cl.CreatedAt >= fromDate);
+        }
+
         public async Task<bool> IsContentLikedByUserAsync(Guid userId, Guid contentId, string contentType)
         {
             return await _likeRepository.GetContentLikes()

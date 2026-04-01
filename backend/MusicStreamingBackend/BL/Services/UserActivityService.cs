@@ -26,6 +26,7 @@ namespace BL.Services
             return await _activityRepository.GetUserActivities()
                 .Where(ua => ua.UserId == userId)
                 .OrderByDescending(ua => ua.CreatedAt)
+                .Include(ua => ua.User)
                 .ToListAsync();
         }
 
@@ -34,6 +35,7 @@ namespace BL.Services
             return await _activityRepository.GetUserActivities()
                 .Where(ua => ua.UserId == userId && ua.CreatedAt >= fromDate)
                 .OrderByDescending(ua => ua.CreatedAt)
+                .Include(ua => ua.User)
                 .ToListAsync();
         }
 

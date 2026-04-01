@@ -43,7 +43,7 @@ namespace MusicStreaming.API.Controllers
                 Id = m.Id,
                 ConversationId = m.ConversationId,
                 SenderId = m.SenderId,
-                SenderUsername = m.Sender.Username,
+                SenderUsername = m.Sender.DisplayUsername(),
                 Content = m.Content,
                 SharedContentId = m.SharedContentId,
                 SharedContentType = m.SharedContentType,
@@ -74,34 +74,26 @@ namespace MusicStreaming.API.Controllers
                 SharedContentId = dto.SharedContentId,
                 SharedContentType = dto.SharedContentType?.ToString()
             };
+            var saved = await _messageService.SendMessageAsync(message);
 
-            try
+            var fullMessage = await _messageService.GetMessageByIdAsync(saved.Id);
+            if (fullMessage == null)
+                return StatusCode(StatusCodes.Status500InternalServerError, new { message = "Message not found after save." });
+
+            var dtoResult = new MessageDto
             {
-                var saved = await _messageService.SendMessageAsync(message);
+                Id = fullMessage.Id,
+                ConversationId = fullMessage.ConversationId,
+                SenderId = fullMessage.SenderId,
+                SenderUsername = fullMessage.Sender.DisplayUsername(),
+                Content = fullMessage.Content,
+                SharedContentId = fullMessage.SharedContentId,
+                SharedContentType = fullMessage.SharedContentType,
+                SentAt = fullMessage.SentAt,
+                IsRead = fullMessage.IsRead
+            };
 
-                var fullMessage = await _messageService.GetMessageByIdAsync(saved.Id);
-                if (fullMessage == null)
-                    return StatusCode(StatusCodes.Status500InternalServerError, new { message = "Message not found after save." });
-
-                var dtoResult = new MessageDto
-                {
-                    Id = fullMessage.Id,
-                    ConversationId = fullMessage.ConversationId,
-                    SenderId = fullMessage.SenderId,
-                    SenderUsername = fullMessage.Sender.Username,
-                    Content = fullMessage.Content,
-                    SharedContentId = fullMessage.SharedContentId,
-                    SharedContentType = fullMessage.SharedContentType,
-                    SentAt = fullMessage.SentAt,
-                    IsRead = fullMessage.IsRead
-                };
-
-                return Ok(dtoResult);
-            }
-            catch (InvalidOperationException ex)
-            {
-                return BadRequest(new { message = ex.Message });
-            }
+            return Ok(dtoResult);
         }
 
         // PUT: api/message/{conversationId}/read

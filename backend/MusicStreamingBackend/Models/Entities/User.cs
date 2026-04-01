@@ -28,6 +28,8 @@ namespace Models.Entities
         public string? ProfileImagePath { get; set; }
         [MaxLength(500)]
         public string? Bio { get; set; }
+        public bool IsDeleted { get; set; } = false;
+        public DateTime? DeletedAt { get; set; }
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
         public ICollection<LocalTrack> LocalTracks { get; set; } = new List<LocalTrack>();

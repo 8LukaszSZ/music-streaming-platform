@@ -1,4 +1,4 @@
-﻿using Models.Entities;
+using Models.Entities;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -10,6 +10,7 @@ namespace IBL
     public interface IContentStatService
     {
         Task<ContentStat> GetOrCreateAsync(Guid contentId, string contentType);
+        Task<ContentStat> GetFromDateAsync(Guid contentId, string contentType, DateTime fromDate);
 
         Task IncrementLikesAsync(Guid contentId, string contentType);
         Task DecrementLikesAsync(Guid contentId, string contentType);

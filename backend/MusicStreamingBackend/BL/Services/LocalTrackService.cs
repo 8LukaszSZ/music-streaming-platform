@@ -42,6 +42,27 @@ namespace BL.Services
         {
             return await _trackRepository.GetByIdAsync(localTrackId);
         }
+        public async Task<List<LocalTrack>> SearchTracksAsync(string query, Guid? viewerUserId, bool isAdmin)
+        {
+            if (string.IsNullOrWhiteSpace(query))
+            {
+                return new List<LocalTrack>();
+            }
+
+            var normalized = query.Trim().ToLower();
+
+            return await _trackRepository.GetLocalTracks()
+                .Include(t => t.User)
+                .Where(t =>
+                    t.Title.ToLower().Contains(normalized) ||
+                    (t.User != null && t.User.Username.ToLower().Contains(normalized)))
+                .Where(t =>
+                    !t.IsPrivate || isAdmin || (viewerUserId.HasValue && t.UserId == viewerUserId.Value))
+                .OrderBy(t => t.Title)
+                .Take(50)
+                .ToListAsync();
+        }
+
 
         public async Task<LocalTrack> AddLocalTrackAsync(LocalTrack localTrack)
         {

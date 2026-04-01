@@ -25,6 +25,8 @@ namespace Models.Entities
         public decimal? Energy { get; set; }
         public DateTime UploadedAt { get; set; } = DateTime.UtcNow;
 
+        public bool IsPrivate { get; set; } = false;
+
         [ForeignKey("UserId")]
         public User? User { get; set; }
         public ICollection<PlaylistTrack> PlaylistTracks { get; set; } = new List<PlaylistTrack>();

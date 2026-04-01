@@ -8,6 +8,7 @@ namespace IBL
     public interface IContentLikeService
     {
         Task<int> GetLikeCountAsync(Guid contentId, string contentType);
+        Task<int> GetLikeCountAsync(Guid contentId, string contentType, DateTime fromDate);
         Task<bool> IsContentLikedByUserAsync(Guid userId, Guid contentId, string contentType);
 
         Task<List<ContentLike>> GetLikesForContentAsync(Guid contentId, string contentType);

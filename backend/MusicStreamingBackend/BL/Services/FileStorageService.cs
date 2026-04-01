@@ -13,8 +13,8 @@ namespace BL.Services
         private const string PlaylistImagesFolder = "UploadedImagesPlaylist";
         private const string MusicFolder = "UploadedMusic";
 
-        private const long MaxImageSize = 5 * 1024 * 1024;  // 5MB
-        private const long MaxMusicSize = 50 * 1024 * 1024; // 50MB
+        private const long MaxImageSize = 50 * 1024 * 1024;  // 50MB
+        private const long MaxMusicSize = 100 * 1024 * 1024; // 100MB
 
         private static readonly string[] AllowedImageExtensions =
         {

@@ -1,4 +1,4 @@
-﻿using IBL;
+using IBL;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Models.DTOs.Conversation;
@@ -32,8 +32,8 @@ namespace MusicStreaming.API.Controllers
                 Id = c.Id,
                 ParticipantAId = c.ParticipantAId,
                 ParticipantBId = c.ParticipantBId,
-                ParticipantAUsername = c.ParticipantA.Username,
-                ParticipantBUsername = c.ParticipantB.Username,
+                ParticipantAUsername = c.ParticipantA.DisplayUsername(),
+                ParticipantBUsername = c.ParticipantB.DisplayUsername(),
                 CreatedAt = c.CreatedAt
             });
 
@@ -62,8 +62,8 @@ namespace MusicStreaming.API.Controllers
                 Id = conversation.Id,
                 ParticipantAId = conversation.ParticipantAId,
                 ParticipantBId = conversation.ParticipantBId,
-                ParticipantAUsername = conversation.ParticipantA.Username,
-                ParticipantBUsername = conversation.ParticipantB.Username,
+                ParticipantAUsername = conversation.ParticipantA.DisplayUsername(),
+                ParticipantBUsername = conversation.ParticipantB.DisplayUsername(),
                 CreatedAt = conversation.CreatedAt
             };
 
@@ -75,31 +75,23 @@ namespace MusicStreaming.API.Controllers
         public async Task<ActionResult<Conversation>> Create([FromBody] Guid otherUserId)
         {
             var userId = User.GetUserId();
+            var conversation = await _conversationService
+                .CreateConversationAsync(userId, otherUserId);
 
-            try
+            var fullConversation = await _conversationService
+                .GetConversationByIdAsync(conversation.Id);
+
+            var dto = new ConversationDto
             {
-                var conversation = await _conversationService
-                    .CreateConversationAsync(userId, otherUserId);
+                Id = fullConversation.Id,
+                ParticipantAId = fullConversation.ParticipantAId,
+                ParticipantBId = fullConversation.ParticipantBId,
+                ParticipantAUsername = fullConversation.ParticipantA.DisplayUsername(),
+                ParticipantBUsername = fullConversation.ParticipantB.DisplayUsername(),
+                CreatedAt = fullConversation.CreatedAt
+            };
 
-                var fullConversation = await _conversationService
-                    .GetConversationByIdAsync(conversation.Id);
-
-                var dto = new ConversationDto
-                {
-                    Id = fullConversation.Id,
-                    ParticipantAId = fullConversation.ParticipantAId,
-                    ParticipantBId = fullConversation.ParticipantBId,
-                    ParticipantAUsername = fullConversation.ParticipantA.Username,
-                    ParticipantBUsername = fullConversation.ParticipantB.Username,
-                    CreatedAt = fullConversation.CreatedAt
-                };
-
-                return Ok(dto);
-            }
-            catch (InvalidOperationException ex)
-            {
-                return BadRequest(new { message = ex.Message });
-            }
+            return Ok(dto);
         }
 
         // DELETE: api/conversation/{id}

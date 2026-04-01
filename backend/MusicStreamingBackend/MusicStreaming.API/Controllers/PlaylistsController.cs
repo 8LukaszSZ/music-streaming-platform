@@ -1,13 +1,11 @@
 using IBL;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using Models.Constants;
 using Models.DTOs.Playlists;
 using Models.Entities;
 using MusicStreaming.API.Extensions;
-using System.IdentityModel.Tokens.Jwt;
-using System.Security.Claims;
+using MusicStreaming.API.Helpers;
 
 namespace MusicStreaming.API.Controllers
 {
@@ -69,9 +67,53 @@ namespace MusicStreaming.API.Controllers
             return Ok(result);
         }
 
+        // GET: api/playlists/search?query=...
+        [HttpGet("search")]
+        [AllowAnonymous]
+        public async Task<ActionResult<IEnumerable<PlaylistSearchResultDto>>> Search([FromQuery] string query)
+        {
+            var isAdmin = User.IsInRole(UserRoles.Admin);
+            Guid? viewerUserId = null;
+            if (User.Identity?.IsAuthenticated == true && !isAdmin)
+                viewerUserId = User.GetUserId();
+
+            var playlists = await _playlistService.SearchPlaylistsByNameAsync(query, viewerUserId, isAdmin);
+
+            var result = playlists.Select(p => new PlaylistSearchResultDto
+            {
+                Id = p.Id,
+                UserId = p.UserId,
+                OwnerUsername = p.User?.DisplayUsername() ?? string.Empty,
+                Name = p.Name,
+                Description = p.Description,
+                IsPublic = p.IsPublic,
+                CreatedAt = p.CreatedAt,
+                PlaylistImagePath = p.PlaylistImagePath,
+                Tracks = p.PlaylistTracks
+                    .Where(pt => pt.LocalTrack != null
+                        && pt.LocalTrack.User != null
+                        && !pt.LocalTrack.User.IsDeleted
+                        && LocalTrackAccess.CanView(pt.LocalTrack, viewerUserId, isAdmin))
+                    .OrderBy(pt => pt.Id)
+                    .Select(pt => new PlaylistTrackSearchItemDto
+                    {
+                        PlaylistTrackId = pt.Id,
+                        LocalTrackId = pt.LocalTrack!.Id,
+                        Title = pt.LocalTrack.Title,
+                        Duration = pt.LocalTrack.Duration,
+                        TrackImagePath = pt.LocalTrack.TrackImagePath,
+                        ArtistUsername = pt.LocalTrack.User!.DisplayUsername(),
+                        IsPrivate = pt.LocalTrack.IsPrivate
+                    })
+                    .ToList()
+            });
+
+            return Ok(result);
+        }
+
         // GET: api/playlists/{id}
         [HttpGet("{id:guid}")]
-        [Authorize(Roles = $"{UserRoles.User},{UserRoles.Admin}")]
+        [AllowAnonymous]
         public async Task<ActionResult<PlaylistResponseDto>> GetById(Guid id)
         {
             var playlist = await _playlistService.GetPlaylistByIdAsync(id);
@@ -80,6 +122,9 @@ namespace MusicStreaming.API.Controllers
 
             if (!playlist.IsPublic && !User.IsInRole(UserRoles.Admin))
             {
+                if (User.Identity?.IsAuthenticated != true)
+                    return Forbid();
+
                 var userId = User.GetUserId();
 
                 if (playlist.UserId != userId)

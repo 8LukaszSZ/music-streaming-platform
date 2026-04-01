@@ -26,6 +26,12 @@ namespace BL.Services
                 .CountAsync(cc => cc.ContentId == contentId && cc.ContentType == contentType);
         }
 
+        public Task<int> GetCommentCountAsync(Guid contentId, string contentType, DateTime fromDate)
+        {
+            return _commentRepository.GetContentComments()
+                .CountAsync(cc => cc.ContentId == contentId && cc.ContentType == contentType && cc.CreatedAt >= fromDate);
+        }
+
         public async Task<List<ContentComment>> GetCommentsForContentAsync(Guid contentId, string contentType)
         {
             return await _commentRepository.GetContentComments()

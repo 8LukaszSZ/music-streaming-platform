@@ -48,6 +48,33 @@ namespace BL.Services
                 .ToListAsync();
         }
 
+        public async Task<List<Playlist>> SearchPlaylistsByNameAsync(string query, Guid? viewerUserId, bool isAdmin)
+        {
+            if (string.IsNullOrWhiteSpace(query))
+                return new List<Playlist>();
+
+            var normalized = query.Trim().ToLower();
+
+            var q = _playlistRepository.GetPlaylists()
+                .Where(p => p.Name.ToLower().Contains(normalized));
+
+            if (!isAdmin)
+            {
+                q = q.Where(p =>
+                    p.IsPublic ||
+                    (viewerUserId.HasValue && p.UserId == viewerUserId.Value));
+            }
+
+            return await q
+                .Include(p => p.User)
+                .Include(p => p.PlaylistTracks)
+                    .ThenInclude(pt => pt.LocalTrack!)
+                        .ThenInclude(t => t.User)
+                .OrderByDescending(p => p.CreatedAt)
+                .Take(50)
+                .ToListAsync();
+        }
+
         public async Task<Playlist?> GetPlaylistByIdAsync(Guid playlistId)
         {
             return await _playlistRepository.GetPlaylists()

@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Mvc;
 using Models.Constants;
 using Models.DTOs.Auth;
 using Models.Entities;
+using MusicStreaming.API.Extensions;
 
 namespace MusicStreaming.API.Controllers
 {
@@ -61,10 +62,11 @@ namespace MusicStreaming.API.Controllers
             var response = new UserResponseDto
             {
                 Id = createdUser.Id,
-                Username = createdUser.Username,
+                Username = createdUser.DisplayUsername(),
                 Email = createdUser.Email,
                 Role = createdUser.Role,
-                CreatedAt = createdUser.CreatedAt
+                CreatedAt = createdUser.CreatedAt,
+                ProfileImagePath = createdUser.DisplayProfileImagePath()
             };
 
             return CreatedAtAction(
@@ -85,7 +87,7 @@ namespace MusicStreaming.API.Controllers
             }
 
             var user = await _userService.GetUserByEmailAsync(dto.Email);
-            if (user == null)
+            if (user == null || user.IsDeleted)
             {
                 return Unauthorized(new { message = "Invalid email or password." });
             }
@@ -101,10 +103,11 @@ namespace MusicStreaming.API.Controllers
             var userDto = new UserResponseDto
             {
                 Id = user.Id,
-                Username = user.Username,
+                Username = user.DisplayUsername(),
                 Email = user.Email,
                 Role = user.Role,
-                CreatedAt = user.CreatedAt
+                CreatedAt = user.CreatedAt,
+                ProfileImagePath = user.DisplayProfileImagePath()
             };
 
             var response = new LoginResponseDto
@@ -136,7 +139,7 @@ namespace MusicStreaming.API.Controllers
             }
 
             var user = await _userService.GetUserByIdAsync(userId);
-            if (user == null)
+            if (user == null || user.IsDeleted)
             {
                 return NotFound();
             }

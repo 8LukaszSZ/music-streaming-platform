@@ -6,6 +6,7 @@ using Models.Constants;
 using Models.DTOs.Tracks;
 using Models.Entities;
 using MusicStreaming.API.Extensions;
+using MusicStreaming.API.Helpers;
 using System.ComponentModel.DataAnnotations;
 
 namespace MusicStreaming.API.Controllers
@@ -48,7 +49,8 @@ namespace MusicStreaming.API.Controllers
                 Energy = t.Energy,
                 UploadedAt = t.UploadedAt,
                 FilePath = t.FilePath,
-                TrackImagePath = t.TrackImagePath
+                TrackImagePath = t.TrackImagePath,
+                IsPrivate = t.IsPrivate
             });
 
             return Ok(result);
@@ -56,20 +58,22 @@ namespace MusicStreaming.API.Controllers
 
         // GET: api/localtracks/{id}
         [HttpGet("{id:guid}")]
-        [Authorize(Roles = $"{UserRoles.User},{UserRoles.Admin}")]
+        [AllowAnonymous]
         public async Task<ActionResult<LocalTrackResponseDto>> GetById(Guid id)
         {
             var track = await _localTrackService.GetLocalTrackByIdAsync(id);
             if (track == null)
                 return NotFound();
 
-            if (!User.IsInRole(UserRoles.Admin))
-            {
-                var userId = User.GetUserId();
+            var isAdmin = User.IsInRole(UserRoles.Admin);
+            Guid? viewerUserId = null;
+            if (User.Identity?.IsAuthenticated == true && !isAdmin)
+                viewerUserId = User.GetUserId();
 
-                if (track.UserId != userId)
-                    return Forbid();
-            }
+            if (!LocalTrackAccess.CanView(track, viewerUserId, isAdmin))
+                return Forbid();
+
+            var showFilePath = isAdmin || (viewerUserId.HasValue && track.UserId == viewerUserId.Value);
 
             var dto = new LocalTrackResponseDto
             {
@@ -80,26 +84,55 @@ namespace MusicStreaming.API.Controllers
                 Valence = track.Valence,
                 Energy = track.Energy,
                 UploadedAt = track.UploadedAt,
-                FilePath = track.FilePath,
-                TrackImagePath = track.TrackImagePath
+                FilePath = showFilePath ? track.FilePath : string.Empty,
+                TrackImagePath = track.TrackImagePath,
+                IsPrivate = track.IsPrivate
             };
 
             return Ok(dto);
         }
 
+        [HttpGet("search")]
+        [AllowAnonymous]
+        public async Task<ActionResult<IEnumerable<LocalTrackResponseDto>>> Search([FromQuery] string query)
+        {
+            var isAdmin = User.IsInRole(UserRoles.Admin);
+            Guid? viewerUserId = null;
+            if (User.Identity?.IsAuthenticated == true && !isAdmin)
+                viewerUserId = User.GetUserId();
+
+            var tracks = await _localTrackService.SearchTracksAsync(query, viewerUserId, isAdmin);
+
+            var result = tracks.Select(t => new LocalTrackResponseDto
+            {
+                Id = t.Id,
+                Title = t.Title,
+                Duration = t.Duration,
+                TrackImagePath = t.TrackImagePath,
+                Username = t.User?.DisplayUsername() ?? "Deleted user",
+                IsPrivate = t.IsPrivate
+            });
+
+            return Ok(result);
+        }
+
         // STREAM: api/localtracks/{id}/stream
+        // Prywatny utwór: wymaga JWT. Tag <audio> nie wysyła nagłówka Authorization — użyj:
+        // GET .../stream?access_token={token} (obsługiwane w Program.cs, OnMessageReceived).
         [HttpGet("{id:guid}/stream")]
-        [Authorize(Roles = $"{UserRoles.User},{UserRoles.Admin}")]
+        [AllowAnonymous]
         public async Task<IActionResult> Stream(Guid id)
         {
             var track = await _localTrackService.GetLocalTrackByIdAsync(id);
             if (track == null)
                 return NotFound();
 
-            if (!User.IsInRole(UserRoles.Admin))
+            if (track.IsPrivate)
             {
-                var userId = User.GetUserId();
-                if (track.UserId != userId)
+                if (User.Identity?.IsAuthenticated != true)
+                    return Unauthorized();
+
+                if (!User.IsInRole(UserRoles.Admin) && User.GetUserId() != track.UserId)
                     return Forbid();
             }
 
@@ -144,7 +177,8 @@ namespace MusicStreaming.API.Controllers
                 Duration = request.Duration,
                 Valence = request.Valence,
                 Energy = request.Energy,
-                UploadedAt = DateTime.UtcNow
+                UploadedAt = DateTime.UtcNow,
+                IsPrivate = request.IsPrivate
             };
 
             var created = await _localTrackService.AddLocalTrackAsync(track);
@@ -157,7 +191,8 @@ namespace MusicStreaming.API.Controllers
                 Duration = created.Duration,
                 Valence = created.Valence,
                 Energy = created.Energy,
-                UploadedAt = created.UploadedAt
+                UploadedAt = created.UploadedAt,
+                IsPrivate = created.IsPrivate
             };
 
             return CreatedAtAction(nameof(GetById), new { id = created.Id }, response);
@@ -186,6 +221,8 @@ namespace MusicStreaming.API.Controllers
             track.Title = request.Title;
             track.Valence = request.Valence;
             track.Energy = request.Energy;
+            if (request.IsPrivate.HasValue)
+                track.IsPrivate = request.IsPrivate.Value;
 
             if (request.TrackImage != null)
             {
@@ -205,7 +242,8 @@ namespace MusicStreaming.API.Controllers
                 Energy = updated.Energy,
                 UploadedAt = updated.UploadedAt,
                 FilePath = updated.FilePath,
-                TrackImagePath = updated.TrackImagePath
+                TrackImagePath = updated.TrackImagePath,
+                IsPrivate = updated.IsPrivate
             };
 
             return Ok(response);

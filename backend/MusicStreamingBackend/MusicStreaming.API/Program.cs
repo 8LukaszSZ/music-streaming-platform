@@ -5,6 +5,8 @@ using BL.Services;
 using IBL;
 using IDAL;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Http.Features;
+using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
@@ -13,9 +15,19 @@ using Models.Entities;
 using System.Text;
 using Microsoft.OpenApi.Models;
 using MusicStreaming.API.Hubs;
+using MusicStreaming.API.Middleware;
 using System.Text.Json.Serialization;
 
 var builder = WebApplication.CreateBuilder(args);
+
+const long maxUploadBodyBytes = 110L * 1024 * 1024;
+builder.Services.Configure<KestrelServerOptions>(o => o.Limits.MaxRequestBodySize = maxUploadBodyBytes);
+builder.Services.Configure<FormOptions>(o =>
+{
+    o.MultipartBodyLengthLimit = maxUploadBodyBytes;
+    o.ValueLengthLimit = int.MaxValue;
+});
+builder.Services.Configure<IISServerOptions>(o => o.MaxRequestBodySize = maxUploadBodyBytes);
 
 builder.Services.AddControllers()
     .AddJsonOptions(options =>
@@ -97,8 +109,21 @@ builder.Services.AddAuthentication(options =>
         {
             var accessToken = context.Request.Query["access_token"];
             var path = context.HttpContext.Request.Path;
+            var pathValue = path.Value ?? string.Empty;
 
-            if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/hubs/chat"))
+            if (string.IsNullOrEmpty(accessToken))
+                return Task.CompletedTask;
+
+            // SignalR
+            if (path.StartsWithSegments("/hubs/chat"))
+            {
+                context.Token = accessToken;
+                return Task.CompletedTask;
+            }
+
+            // <audio src> nie wysyła nagłówka Authorization — token w query dla odtwarzania (np. prywatne utwory).
+            if (pathValue.Contains("/localtracks/", StringComparison.OrdinalIgnoreCase)
+                && pathValue.EndsWith("/stream", StringComparison.OrdinalIgnoreCase))
             {
                 context.Token = accessToken;
             }
@@ -157,6 +182,7 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+app.UseMiddleware<ExceptionHandlingMiddleware>();
 
 app.UseAuthentication();
 app.UseAuthorization();

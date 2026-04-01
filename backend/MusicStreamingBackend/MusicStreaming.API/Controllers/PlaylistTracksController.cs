@@ -5,8 +5,7 @@ using Models.Constants;
 using Models.DTOs.Playlists;
 using Models.Entities;
 using MusicStreaming.API.Extensions;
-using System.IdentityModel.Tokens.Jwt;
-using System.Security.Claims;
+using MusicStreaming.API.Helpers;
 
 namespace MusicStreaming.API.Controllers
 {
@@ -17,41 +16,47 @@ namespace MusicStreaming.API.Controllers
     {
         private readonly IPlaylistTrackService _playlistTrackService;
         private readonly IPlaylistService _playlistService;
+        private readonly ILocalTrackService _localTrackService;
 
         public PlaylistTracksController(
             IPlaylistTrackService playlistTrackService,
-            IPlaylistService playlistService)
+            IPlaylistService playlistService,
+            ILocalTrackService localTrackService)
         {
             _playlistTrackService = playlistTrackService;
             _playlistService = playlistService;
+            _localTrackService = localTrackService;
         }
 
-        private async Task<bool> CanAccessPlaylistAsync(Playlist playlist)
+        private Task<bool> CanAccessPlaylistAsync(Playlist playlist)
         {
             if (playlist.IsPublic)
-                return true;
+                return Task.FromResult(true);
 
             if (User.IsInRole(UserRoles.Admin))
-                return true;
+                return Task.FromResult(true);
+
+            if (User.Identity?.IsAuthenticated != true)
+                return Task.FromResult(false);
 
             var userId = User.GetUserId();
 
-            return playlist.UserId == userId;
+            return Task.FromResult(playlist.UserId == userId);
         }
 
-        private async Task<bool> IsOwnerAsync(Playlist playlist)
+        private Task<bool> IsOwnerAsync(Playlist playlist)
         {
             if (User.IsInRole(UserRoles.Admin))
-                return true;
+                return Task.FromResult(true);
 
             var userId = User.GetUserId();
 
-            return playlist.UserId == userId;
+            return Task.FromResult(playlist.UserId == userId);
         }
 
         // GET: api/playlists/{playlistId}/tracks
         [HttpGet]
-        [Authorize(Roles = $"{UserRoles.User},{UserRoles.Admin}")]
+        [AllowAnonymous]
         public async Task<ActionResult<IEnumerable<PlaylistTrackResponseDto>>> GetTracks(Guid playlistId)
         {
             var playlist = await _playlistService.GetPlaylistByIdAsync(playlistId);
@@ -89,6 +94,14 @@ namespace MusicStreaming.API.Controllers
             if (!await IsOwnerAsync(playlist))
                 return Forbid();
 
+            var localTrack = await _localTrackService.GetLocalTrackByIdAsync(dto.LocalTrackId);
+            if (localTrack == null)
+                return NotFound();
+
+            var isAdmin = User.IsInRole(UserRoles.Admin);
+            if (!LocalTrackAccess.CanAddToPlaylist(localTrack, playlist, isAdmin))
+                return BadRequest(new { message = "This song cannot be added to this playlist (private songs only to your own private playlist)." });
+
             var playlistTrack = new PlaylistTrack
             {
                 PlaylistId = playlistId,
@@ -121,6 +134,10 @@ namespace MusicStreaming.API.Controllers
             if (!await IsOwnerAsync(playlist))
                 return Forbid();
 
+            var playlistTrack = await _playlistTrackService.GetPlaylistTrackByIdAsync(playlistTrackId);
+            if (playlistTrack == null || playlistTrack.PlaylistId != playlistId)
+                return NotFound();
+
             var removed = await _playlistTrackService.RemoveTrackFromPlaylistAsync(playlistTrackId);
             if (removed == null)
                 return NotFound();
@@ -130,7 +147,7 @@ namespace MusicStreaming.API.Controllers
 
         // GET: api/playlists/{playlistId}/tracks/{localTrackId}/exists
         [HttpGet("{localTrackId:guid}/exists")]
-        [Authorize(Roles = $"{UserRoles.User},{UserRoles.Admin}")]
+        [AllowAnonymous]
         public async Task<ActionResult> IsTrackInPlaylist(Guid playlistId, Guid localTrackId)
         {
             var playlist = await _playlistService.GetPlaylistByIdAsync(playlistId);

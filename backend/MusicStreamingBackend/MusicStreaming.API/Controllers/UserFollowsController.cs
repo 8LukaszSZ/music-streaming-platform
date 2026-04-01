@@ -4,8 +4,6 @@ using Microsoft.AspNetCore.Mvc;
 using Models.Constants;
 using Models.DTOs.Auth;
 using MusicStreaming.API.Extensions;
-using System.IdentityModel.Tokens.Jwt;
-using System.Security.Claims;
 
 namespace MusicStreaming.API.Controllers
 {
@@ -27,7 +25,6 @@ namespace MusicStreaming.API.Controllers
         public async Task<ActionResult> Follow(Guid targetUserId)
         {
             var userId = User.GetUserId();
-
             await _userFollowsService.FollowAsync(userId, targetUserId);
             return NoContent();
         }
@@ -38,7 +35,6 @@ namespace MusicStreaming.API.Controllers
         public async Task<ActionResult> Unfollow(Guid targetUserId)
         {
             var userId = User.GetUserId();
-
             await _userFollowsService.UnfollowAsync(userId, targetUserId);
             return NoContent();
         }
@@ -73,10 +69,11 @@ namespace MusicStreaming.API.Controllers
             var result = users.Select(u => new UserResponseDto
             {
                 Id = u.Id,
-                Username = u.Username,
+                Username = u.DisplayUsername(),
                 Email = isAdmin ? u.Email : string.Empty,
                 Role = u.Role,
-                CreatedAt = u.CreatedAt
+                CreatedAt = u.CreatedAt,
+                ProfileImagePath = u.DisplayProfileImagePath()
             });
 
             return Ok(result);
@@ -94,10 +91,11 @@ namespace MusicStreaming.API.Controllers
             var result = users.Select(u => new UserResponseDto
             {
                 Id = u.Id,
-                Username = u.Username,
+                Username = u.DisplayUsername(),
                 Email = isAdmin ? u.Email : string.Empty,
                 Role = u.Role,
-                CreatedAt = u.CreatedAt
+                CreatedAt = u.CreatedAt,
+                ProfileImagePath = u.DisplayProfileImagePath()
             });
 
             return Ok(result);

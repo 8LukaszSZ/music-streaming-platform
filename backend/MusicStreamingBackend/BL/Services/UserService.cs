@@ -52,7 +52,7 @@ namespace BL.Services
             var normalized = query.Trim().ToLower();
 
             return await _userRepository.GetUsers()
-                .Where(u => u.Username.ToLower().Contains(normalized))
+                .Where(u => !u.IsDeleted && u.Username.ToLower().Contains(normalized))
                 .OrderBy(u => u.Username)
                 .Take(50)
                 .ToListAsync();
@@ -76,6 +76,8 @@ namespace BL.Services
             var user = await _userRepository.GetByIdAsync(userId);
             if (user == null)
                 throw new InvalidOperationException("User not found.");
+            if (user.IsDeleted)
+                throw new InvalidOperationException("Cannot update a deleted user.");
 
             user.Bio = bio ?? user.Bio;
             user.ProfileImagePath = profileImage ?? user.ProfileImagePath;
@@ -84,7 +86,18 @@ namespace BL.Services
         }
         public async Task<User?> DeleteUserAsync(Guid userId)
         {
-            return await _userRepository.DeleteAsync(userId);
+            var user = await _userRepository.GetByIdAsync(userId);
+            if (user == null)
+                return null;
+
+            user.IsDeleted = true;
+            user.DeletedAt = DateTime.UtcNow;
+            user.ProfileImagePath = null;
+            user.Bio = null;
+            user.Username = $"Deleted_{user.Id}";
+            user.Email = $"deleted_{user.Id}@deleted.local";
+
+            return await _userRepository.UpdateAsync(user);
         }
         public async Task<bool> IsEmailTakenAsync(string email)
         {
@@ -99,6 +112,8 @@ namespace BL.Services
             var user = await _userRepository.GetByIdAsync(userId);
             if (user == null)
                 throw new InvalidOperationException("User not found.");
+            if (user.IsDeleted)
+                throw new InvalidOperationException("Cannot update role for a deleted user.");
 
             user.Role = role;
             return await _userRepository.UpdateAsync(user);

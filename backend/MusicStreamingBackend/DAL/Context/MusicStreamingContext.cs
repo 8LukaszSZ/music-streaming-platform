@@ -29,6 +29,19 @@ namespace DAL.Context
         {
             base.OnModelCreating(modelBuilder);
 
+            ConfigureUser(modelBuilder);
+            ConfigureUserFollows(modelBuilder);
+            ConfigureContentLike(modelBuilder);
+            ConfigureContentComment(modelBuilder);
+            ConfigureContentStat(modelBuilder);
+            ConfigureContentPlay(modelBuilder);
+            ConfigureUserActivity(modelBuilder);
+            ConfigureConversation(modelBuilder);
+            ConfigureMessage(modelBuilder);
+        }
+
+        private static void ConfigureUser(ModelBuilder modelBuilder)
+        {
             modelBuilder.Entity<User>()
                 .HasIndex(u => u.Email)
                 .IsUnique();
@@ -36,7 +49,10 @@ namespace DAL.Context
             modelBuilder.Entity<User>()
                 .HasIndex(u => u.Username)
                 .IsUnique();
+        }
 
+        private static void ConfigureUserFollows(ModelBuilder modelBuilder)
+        {
             modelBuilder.Entity<UserFollows>()
                 .HasIndex(uf => new { uf.FollowerId, uf.FollowingId })
                 .IsUnique();
@@ -52,7 +68,10 @@ namespace DAL.Context
                 .WithMany(u => u.Followers)
                 .HasForeignKey(uf => uf.FollowingId)
                 .OnDelete(DeleteBehavior.Restrict);
+        }
 
+        private static void ConfigureContentLike(ModelBuilder modelBuilder)
+        {
             modelBuilder.Entity<ContentLike>()
                 .HasOne(cl => cl.User)
                 .WithMany(u => u.ContentLikes)
@@ -62,7 +81,10 @@ namespace DAL.Context
             modelBuilder.Entity<ContentLike>()
                 .HasIndex(cl => new { cl.UserId, cl.ContentId, cl.ContentType })
                 .IsUnique();
+        }
 
+        private static void ConfigureContentComment(ModelBuilder modelBuilder)
+        {
             modelBuilder.Entity<ContentComment>()
                 .HasOne(cc => cc.User)
                 .WithMany(u => u.ContentComments)
@@ -74,11 +96,17 @@ namespace DAL.Context
                 .WithMany(c => c.Replies)
                 .HasForeignKey(cc => cc.ParentCommentId)
                 .OnDelete(DeleteBehavior.Restrict);
+        }
 
+        private static void ConfigureContentStat(ModelBuilder modelBuilder)
+        {
             modelBuilder.Entity<ContentStat>()
                 .HasIndex(cs => new { cs.ContentId, cs.ContentType })
                 .IsUnique();
+        }
 
+        private static void ConfigureContentPlay(ModelBuilder modelBuilder)
+        {
             modelBuilder.Entity<ContentPlay>()
                 .HasOne(cp => cp.User)
                 .WithMany()
@@ -91,7 +119,10 @@ namespace DAL.Context
             modelBuilder.Entity<ContentPlay>()
                 .HasIndex(cp => cp.UserId)
                 .HasFilter("\"UserId\" IS NOT NULL");
+        }
 
+        private static void ConfigureUserActivity(ModelBuilder modelBuilder)
+        {
             modelBuilder.Entity<UserActivity>()
                 .HasOne(ua => ua.User)
                 .WithMany(u => u.UserActivities)
@@ -103,7 +134,10 @@ namespace DAL.Context
 
             modelBuilder.Entity<UserActivity>()
                 .HasIndex(ua => new { ua.ContentId, ua.ContentType });
+        }
 
+        private static void ConfigureConversation(ModelBuilder modelBuilder)
+        {
             modelBuilder.Entity<Conversation>()
                 .HasOne(c => c.ParticipantA)
                 .WithMany(u => u.ConversationsAsA)
@@ -119,7 +153,10 @@ namespace DAL.Context
             modelBuilder.Entity<Conversation>()
                 .HasIndex(c => new { c.ParticipantAId, c.ParticipantBId })
                 .IsUnique();
+        }
 
+        private static void ConfigureMessage(ModelBuilder modelBuilder)
+        {
             modelBuilder.Entity<Message>()
                 .HasOne(m => m.Conversation)
                 .WithMany(c => c.Messages)
