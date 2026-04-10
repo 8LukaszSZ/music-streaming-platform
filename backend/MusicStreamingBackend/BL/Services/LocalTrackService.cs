@@ -33,6 +33,7 @@ namespace BL.Services
         public async Task<List<LocalTrack>> GetLocalTracksByUserIdAsync(Guid userId)
         {
             return await _trackRepository.GetLocalTracks()
+                .Include(t => t.User)
                 .Where(t => t.UserId == userId)
                 .OrderByDescending(t => t.UploadedAt)
                 .ToListAsync();

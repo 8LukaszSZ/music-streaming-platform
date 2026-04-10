@@ -17,6 +17,7 @@ using Microsoft.OpenApi.Models;
 using MusicStreaming.API.Hubs;
 using MusicStreaming.API.Middleware;
 using System.Text.Json.Serialization;
+using Microsoft.Extensions.FileProviders;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -133,6 +134,26 @@ builder.Services.AddAuthentication(options =>
     };
 });
 
+var origins = builder.Configuration
+    .GetSection("Cors:AllowedOrigins")
+    .Get<string[]>();
+
+if (origins == null || origins.Length == 0)
+{
+    throw new Exception("No CORS configuration in appsettings.json");
+}
+
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowFrontend", policy =>
+    {
+        policy.WithOrigins(origins)
+              .AllowAnyMethod()
+              .AllowAnyHeader()
+              .AllowCredentials();
+    });
+});
+
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
@@ -184,9 +205,30 @@ if (app.Environment.IsDevelopment())
 app.UseHttpsRedirection();
 app.UseMiddleware<ExceptionHandlingMiddleware>();
 
+app.UseCors("AllowFrontend");
 app.UseAuthentication();
 app.UseAuthorization();
 app.UseStaticFiles();
+app.UseStaticFiles(new StaticFileOptions
+{
+    FileProvider = new PhysicalFileProvider(Path.Combine(builder.Environment.ContentRootPath, "UploadedImagesUser")),
+    RequestPath = "/UploadedImagesUser"
+});
+app.UseStaticFiles(new StaticFileOptions
+{
+    FileProvider = new PhysicalFileProvider(Path.Combine(builder.Environment.ContentRootPath, "UploadedImagesTracks")),
+    RequestPath = "/UploadedImagesTracks"
+});
+app.UseStaticFiles(new StaticFileOptions
+{
+    FileProvider = new PhysicalFileProvider(Path.Combine(builder.Environment.ContentRootPath, "UploadedImagesPlaylist")),
+    RequestPath = "/UploadedImagesPlaylist"
+});
+app.UseStaticFiles(new StaticFileOptions
+{
+    FileProvider = new PhysicalFileProvider(Path.Combine(builder.Environment.ContentRootPath, "UploadedMusic")),
+    RequestPath = "/UploadedMusic"
+});
 app.MapControllers();
 app.MapHub<ChatHub>("/hubs/chat");
 

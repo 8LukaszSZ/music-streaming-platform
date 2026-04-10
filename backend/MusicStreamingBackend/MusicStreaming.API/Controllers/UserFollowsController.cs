@@ -59,7 +59,8 @@ namespace MusicStreaming.API.Controllers
 
         // GET: api/userfollows/{userId}/followers
         [HttpGet("{userId:guid}/followers")]
-        [Authorize(Roles = $"{UserRoles.User},{UserRoles.Admin}")]
+        //[Authorize(Roles = $"{UserRoles.User},{UserRoles.Admin}")]
+        [AllowAnonymous]
         public async Task<ActionResult<IEnumerable<UserResponseDto>>> GetFollowers(Guid userId)
         {
             var users = await _userFollowsService.GetFollowersAsync(userId);
@@ -81,7 +82,8 @@ namespace MusicStreaming.API.Controllers
 
         // GET: api/userfollows/{userId}/following
         [HttpGet("{userId:guid}/following")]
-        [Authorize(Roles = $"{UserRoles.User},{UserRoles.Admin}")]
+        //[Authorize(Roles = $"{UserRoles.User},{UserRoles.Admin}")]
+        [AllowAnonymous]
         public async Task<ActionResult<IEnumerable<UserResponseDto>>> GetFollowing(Guid userId)
         {
             var users = await _userFollowsService.GetFollowingAsync(userId);

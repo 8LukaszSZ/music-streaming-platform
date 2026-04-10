@@ -46,6 +46,34 @@ namespace MusicStreaming.API.Controllers
             return Ok(result);
         }
 
+        // GET: api/playlists/user/{userId}
+        [HttpGet("user/{userId:guid}")]
+        [AllowAnonymous]
+        public async Task<ActionResult<IEnumerable<PlaylistResponseDto>>> GetPlaylistsByUserId(Guid userId)
+        {
+            var isAdmin = User.IsInRole(UserRoles.Admin);
+            Guid? viewerUserId = null;
+            if (User.Identity?.IsAuthenticated == true && !isAdmin)
+                viewerUserId = User.GetUserId();
+
+            var playlists = await _playlistService.GetPlaylistsByUserIdAsync(userId);
+
+            var result = playlists
+                .Where(p => p.IsPublic || isAdmin || (viewerUserId.HasValue && p.UserId == viewerUserId.Value))
+                .Select(p => new PlaylistResponseDto
+                {
+                    Id = p.Id,
+                    UserId = p.UserId,
+                    Name = p.Name,
+                    Description = p.Description,
+                    IsPublic = p.IsPublic,
+                    CreatedAt = p.CreatedAt,
+                    PlaylistImagePath = p.PlaylistImagePath
+                });
+
+            return Ok(result);
+        }
+
         // GET: api/playlists/public
         [HttpGet("public")]
         [AllowAnonymous]

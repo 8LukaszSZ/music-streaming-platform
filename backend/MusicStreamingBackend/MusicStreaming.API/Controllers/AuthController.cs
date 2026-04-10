@@ -66,7 +66,8 @@ namespace MusicStreaming.API.Controllers
                 Email = createdUser.Email,
                 Role = createdUser.Role,
                 CreatedAt = createdUser.CreatedAt,
-                ProfileImagePath = createdUser.DisplayProfileImagePath()
+                ProfileImagePath = createdUser.DisplayProfileImagePath(),
+                Bio = createdUser.Bio
             };
 
             return CreatedAtAction(
@@ -107,7 +108,8 @@ namespace MusicStreaming.API.Controllers
                 Email = user.Email,
                 Role = user.Role,
                 CreatedAt = user.CreatedAt,
-                ProfileImagePath = user.DisplayProfileImagePath()
+                ProfileImagePath = user.DisplayProfileImagePath(),
+                Bio = user.Bio
             };
 
             var response = new LoginResponseDto

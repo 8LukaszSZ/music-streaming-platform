@@ -34,6 +34,7 @@ namespace BL.Services
         public async Task<List<Playlist>> GetPlaylistsByUserIdAsync(Guid userId)
         {
             return await _playlistRepository.GetPlaylists()
+                .Include(p => p.User)
                 .Where(p => p.UserId == userId)
                 .OrderByDescending(p => p.CreatedAt)
                 .ToListAsync();

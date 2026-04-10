@@ -3,7 +3,9 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Models.Constants;
 using Models.DTOs.Interactions;
+using Models.DTOs.Tracks;
 using MusicStreaming.API.Extensions;
+using MusicStreaming.API.Helpers;
 
 namespace MusicStreaming.API.Controllers
 {
@@ -55,6 +57,64 @@ namespace MusicStreaming.API.Controllers
             var userId = User.GetUserId();
             var isLiked = await _contentLikeService.IsContentLikedByUserAsync(userId, contentId, contentType.ToString());
             return Ok(isLiked);
+        }
+
+        // GET: api/contentlikes/me/tracks
+        [HttpGet("me/tracks")]
+        [Authorize(Roles = $"{UserRoles.User},{UserRoles.Admin}")]
+        public async Task<ActionResult<IEnumerable<LocalTrackResponseDto>>> GetLikedTracksByMe()
+        {
+            var userId = User.GetUserId();
+            var tracks = await _contentLikeService.GetLikedTracksByUserAsync(userId);
+
+            var result = tracks.Select(t => new LocalTrackResponseDto
+            {
+                Id = t.Id,
+                UserId = t.UserId,
+                Title = t.Title,
+                Duration = t.Duration,
+                Valence = t.Valence,
+                Energy = t.Energy,
+                UploadedAt = t.UploadedAt,
+                FilePath = t.FilePath,
+                TrackImagePath = t.TrackImagePath,
+                Username = t.User?.DisplayUsername() ?? string.Empty,
+                IsPrivate = t.IsPrivate
+            });
+
+            return Ok(result);
+        }
+
+        // GET: api/contentlikes/user/{userId}/tracks
+        [HttpGet("user/{userId:guid}/tracks")]
+        [AllowAnonymous]
+        public async Task<ActionResult<IEnumerable<LocalTrackResponseDto>>> GetLikedTracksByUserId(Guid userId)
+        {
+            var isAdmin = User.IsInRole(UserRoles.Admin);
+            Guid? viewerUserId = null;
+            if (User.Identity?.IsAuthenticated == true && !isAdmin)
+                viewerUserId = User.GetUserId();
+
+            var tracks = await _contentLikeService.GetLikedTracksByUserAsync(userId);
+
+            var result = tracks
+                .Where(t => LocalTrackAccess.CanView(t, viewerUserId, isAdmin))
+                .Select(t => new LocalTrackResponseDto
+                {
+                    Id = t.Id,
+                    UserId = t.UserId,
+                    Title = t.Title,
+                    Duration = t.Duration,
+                    Valence = t.Valence,
+                    Energy = t.Energy,
+                    UploadedAt = t.UploadedAt,
+                    FilePath = (isAdmin || (viewerUserId.HasValue && t.UserId == viewerUserId.Value)) ? t.FilePath : string.Empty,
+                    TrackImagePath = t.TrackImagePath,
+                    Username = t.User?.DisplayUsername() ?? "Deleted user",
+                    IsPrivate = t.IsPrivate
+                });
+
+            return Ok(result);
         }
 
         // POST: api/contentlikes

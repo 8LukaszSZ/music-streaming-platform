@@ -10,6 +10,7 @@ namespace Models.DTOs.Auth
         public string Role { get; set; } = string.Empty;
         public DateTime CreatedAt { get; set; }
         public string? ProfileImagePath { get; set; }
+        public string? Bio { get; set; }
     }
 }
 

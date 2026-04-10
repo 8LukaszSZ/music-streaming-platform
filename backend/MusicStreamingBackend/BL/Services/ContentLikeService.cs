@@ -67,6 +67,7 @@ namespace BL.Services
             var trackIds = likes.Select(l => l.ContentId).ToList();
             var tracks = await _localTrackRepository.GetLocalTracks()
                 .Where(t => trackIds.Contains(t.Id))
+                .Include(t => t.User)
                 .ToListAsync();
 
             var trackDict = tracks.ToDictionary(t => t.Id);

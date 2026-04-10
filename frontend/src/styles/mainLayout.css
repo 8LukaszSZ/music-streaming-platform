@@ -1,0 +1,9 @@
+/* This file is now split into smaller files:
+   - layout.css - general layout, navigation, buttons
+   - components.css - reusable components (tiles, panels, etc.)
+   - profile.css - profile page specific styles
+   - audioPlayer.css - audio player styles
+   - footer.css - footer styles
+
+   Import these files in your components instead of this one.
+*/

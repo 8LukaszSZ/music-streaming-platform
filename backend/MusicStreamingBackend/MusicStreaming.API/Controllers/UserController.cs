@@ -40,7 +40,8 @@ namespace MusicStreaming.API.Controllers
                 Email = u.Email,
                 Role = u.Role,
                 CreatedAt = u.CreatedAt,
-                ProfileImagePath = u.DisplayProfileImagePath()
+                ProfileImagePath = u.DisplayProfileImagePath(),
+                Bio = u.Bio
             });
 
             return Ok(result);
@@ -66,7 +67,8 @@ namespace MusicStreaming.API.Controllers
                 Email = isAdmin ? user.Email : string.Empty,
                 Role = user.Role,
                 CreatedAt = user.CreatedAt,
-                ProfileImagePath = user.DisplayProfileImagePath()
+                ProfileImagePath = user.DisplayProfileImagePath(),
+                Bio = user.Bio
             };
 
             return Ok(dto);
@@ -96,7 +98,8 @@ namespace MusicStreaming.API.Controllers
                 Email = user.Email,
                 Role = user.Role,
                 CreatedAt = user.CreatedAt,
-                ProfileImagePath = user.DisplayProfileImagePath()
+                ProfileImagePath = user.DisplayProfileImagePath(),
+                Bio = user.Bio
 
             };
 
@@ -130,7 +133,8 @@ namespace MusicStreaming.API.Controllers
                 Email = updated.Email,
                 Role = updated.Role,
                 CreatedAt = updated.CreatedAt,
-                ProfileImagePath = updated.DisplayProfileImagePath()
+                ProfileImagePath = updated.DisplayProfileImagePath(),
+                Bio = updated.Bio
             };
 
             return Ok(response);
@@ -176,7 +180,8 @@ namespace MusicStreaming.API.Controllers
                 Email = isAdmin ? u.Email : string.Empty,
                 Role = u.Role,
                 CreatedAt = u.CreatedAt,
-                ProfileImagePath = u.DisplayProfileImagePath()
+                ProfileImagePath = u.DisplayProfileImagePath(),
+                Bio = u.Bio
             });
 
             return Ok(result);
@@ -201,7 +206,8 @@ namespace MusicStreaming.API.Controllers
                 Email = updated.Email,
                 Role = updated.Role,
                 CreatedAt = updated.CreatedAt,
-                ProfileImagePath = updated.DisplayProfileImagePath()
+                ProfileImagePath = updated.DisplayProfileImagePath(),
+                Bio = updated.Bio
             };
 
             return Ok(response);
