@@ -1,7 +1,9 @@
+import { useNavigate } from 'react-router-dom'
 import { useAudio } from '../contexts/AudioContext'
 import { likeTrack, unlikeTrack } from '../api/audioApi'
 
 export function AudioPlayer() {
+  const navigate = useNavigate()
   const { currentTrack, isPlaying, progress, duration, volume, pauseTrack, resumeTrack, seek, setVolume, nextTrack, prevTrack, likedTracks, toggleLike } = useAudio()
 
   if (!currentTrack) return null
@@ -70,8 +72,26 @@ export function AudioPlayer() {
             <div className="audio-player-image placeholder">{currentTrack.title.slice(0, 1).toUpperCase()}</div>
           )}
           <div className="audio-player-info">
-            <p className="audio-player-title">{currentTrack.title}</p>
-            {currentTrack.subtitle ? <p className="audio-player-subtitle">{currentTrack.subtitle}</p> : null}
+            <button
+              type="button"
+              className="audio-player-title"
+              onClick={() => navigate(`/track/${currentTrack.id}`)}
+            >
+              {currentTrack.title}
+            </button>
+            {currentTrack.subtitle ? (
+              currentTrack.userId ? (
+                <button
+                  type="button"
+                  className="audio-player-subtitle"
+                  onClick={() => navigate(`/profile/${currentTrack.userId}`)}
+                >
+                  {currentTrack.subtitle}
+                </button>
+              ) : (
+                <p className="audio-player-subtitle">{currentTrack.subtitle}</p>
+              )
+            ) : null}
           </div>
           <button type="button" className="audio-player-like-btn" onClick={handleLike} aria-label={liked ? 'Unlike' : 'Like'}>
             <svg viewBox="0 0 24 24" className={`icon ${liked ? 'liked' : ''}`} aria-hidden="true">

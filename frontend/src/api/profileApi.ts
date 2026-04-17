@@ -42,6 +42,53 @@ export function getFollowing(userId: string, token?: string) {
   return request<UserLiteDto[]>(`/userfollows/${userId}/following`, { token })
 }
 
+export async function followUser(userId: string, token: string) {
+  return request(`/userfollows/${userId}`, {
+    method: 'POST',
+    token,
+  })
+}
+
+export async function unfollowUser(userId: string, token: string) {
+  return request(`/userfollows/${userId}`, {
+    method: 'DELETE',
+    token,
+  })
+}
+
+export async function deletePlaylist(playlistId: string, token: string) {
+  return request(`/playlists/${playlistId}`, {
+    method: 'DELETE',
+    token,
+  })
+}
+
+export function getPlaylistById(playlistId: string, token?: string) {
+  return request<PlaylistDto>(`/playlists/${playlistId}`, { token })
+}
+
+export async function updatePlaylistVisibility(playlistId: string, isPublic: boolean, token: string) {
+  return request(`/playlists/${playlistId}/visibility`, {
+    method: 'PUT',
+    body: { isPublic },
+    token,
+  })
+}
+
+export async function updatePlaylist(playlistId: string, token: string, payload: { name?: string; description?: string; playlistImage?: File }) {
+  const formData = new FormData()
+  formData.append('Name', payload.name || '')
+  if (payload.description !== undefined) formData.append('Description', payload.description)
+  if (payload.playlistImage) formData.append('PlaylistImage', payload.playlistImage)
+
+  return request(`/playlists/${playlistId}`, {
+    method: 'PUT',
+    body: formData,
+    token,
+    isFormData: true,
+  })
+}
+
 export function getMyLikedTracks(token: string) {
   return request<TrackDto[]>('/contentlikes/me/tracks', { token })
 }
@@ -59,6 +106,25 @@ export async function updateMyProfile(token: string, payload: { bio: string; pro
 
   return request<UserDto>('/user/me/profile', {
     method: 'PUT',
+    body: formData,
+    token,
+    isFormData: true,
+  })
+}
+
+export async function createPlaylist(token: string, payload: { name: string; description?: string; isPublic: boolean; playlistImage?: File }) {
+  const formData = new FormData()
+  formData.append('name', payload.name)
+  if (payload.description) {
+    formData.append('description', payload.description)
+  }
+  formData.append('isPublic', payload.isPublic.toString())
+  if (payload.playlistImage) {
+    formData.append('playlistImage', payload.playlistImage)
+  }
+
+  return request<PlaylistDto>('/playlists', {
+    method: 'POST',
     body: formData,
     token,
     isFormData: true,

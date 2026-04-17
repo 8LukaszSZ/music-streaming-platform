@@ -72,6 +72,13 @@
   border-radius: 9px;
 }
 
+.profile-header-actions {
+  margin-left: auto;
+  display: flex;
+  gap: 8px;
+  align-self: flex-start;
+}
+
 .profile-pill {
   display: inline-flex;
   align-items: baseline;
@@ -478,8 +485,99 @@
   font-size: 14px;
 }
 
+.track-title {
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  cursor: pointer;
+  transition: color 0.15s ease;
+  text-align: left;
+  font-family: inherit;
+  color: var(--text-h);
+  font-weight: 600;
+  font-size: inherit;
+  line-height: inherit;
+  display: block;
+  -webkit-appearance: none;
+  appearance: none;
+  text-decoration: none;
+}
+
+.track-title:hover {
+  color: #9e77ff;
+}
+
 .profile-side .track-meta {
   font-size: 12px;
+}
+
+.track-meta button {
+  background: transparent !important;
+  border: none !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  cursor: pointer;
+  transition: color 0.15s ease;
+  text-align: left;
+  font-family: inherit;
+  color: var(--muted);
+  font-size: inherit;
+  font-weight: inherit;
+  line-height: inherit;
+  display: inline;
+  -webkit-appearance: none;
+  appearance: none;
+  text-decoration: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  box-shadow: none;
+  outline: none;
+}
+
+.track-meta button:hover {
+  color: #9e77ff !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.track-meta button:focus {
+  outline: none;
+  box-shadow: none;
+}
+
+.username-link {
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  cursor: pointer;
+  transition: color 0.15s ease;
+  text-align: left;
+  font-family: inherit;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: inherit;
+  line-height: inherit;
+  display: inline-block;
+  -webkit-appearance: none;
+  appearance: none;
+  text-decoration: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  box-shadow: none;
+  outline: none;
+}
+
+.username-link:hover {
+  color: #9e77ff;
+}
+
+.username-link:focus {
+  outline: none;
+  box-shadow: none;
 }
 
 .profile-side .profile-pill-value {
@@ -609,5 +707,111 @@
 @media (max-width: 920px) {
   .profile-layout {
     grid-template-columns: 1fr;
+  }
+}
+
+/* Skeleton loader styles */
+.profile-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.profile-header-skeleton {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  padding-bottom: 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.profile-avatar-skeleton {
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.06);
+  animation: skeleton-pulse 1.5s ease-in-out infinite;
+}
+
+.profile-header-content-skeleton {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.skeleton-text {
+  height: 16px;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 4px;
+  animation: skeleton-pulse 1.5s ease-in-out infinite;
+}
+
+.skeleton-title {
+  width: 60%;
+}
+
+.skeleton-subtitle {
+  width: 40%;
+}
+
+.skeleton-stats {
+  width: 30%;
+}
+
+.profile-tabs-skeleton {
+  display: flex;
+  gap: 18px;
+  margin-top: 22px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  padding-bottom: 2px;
+}
+
+.skeleton-tab {
+  width: 60px;
+  height: 32px;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 4px;
+  animation: skeleton-pulse 1.5s ease-in-out infinite;
+}
+
+.profile-list-skeleton {
+  margin-top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.profile-media-tile-skeleton {
+  display: flex;
+  gap: 10px;
+  padding: 9px 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.skeleton-image {
+  width: 44px;
+  height: 44px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.06);
+  animation: skeleton-pulse 1.5s ease-in-out infinite;
+  flex-shrink: 0;
+}
+
+.skeleton-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+@keyframes skeleton-pulse {
+  0%, 100% {
+    opacity: 0.4;
+  }
+  50% {
+    opacity: 0.7;
   }
 }

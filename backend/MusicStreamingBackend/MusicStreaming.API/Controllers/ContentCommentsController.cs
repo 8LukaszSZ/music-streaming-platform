@@ -120,6 +120,7 @@ namespace MusicStreaming.API.Controllers
                 ParentCommentId = comment.ParentCommentId,
                 Content = comment.Content,
                 CreatedAt = comment.CreatedAt,
+                IsDeleted = comment.IsDeleted,
                 User = new UserLiteDto
                 {
                     Id = comment.UserId,

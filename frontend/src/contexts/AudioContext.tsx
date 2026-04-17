@@ -1,34 +1,7 @@
 import { createContext, useContext, useState, useRef, useCallback } from 'react'
 import type { ReactNode } from 'react'
-import { getTrackStreamUrl } from '../api/audioApi'
-
-type TrackInfo = {
-  id: string
-  title: string
-  subtitle?: string
-  imageUrl?: string
-  duration?: number
-}
-
-type AudioContextType = {
-  currentTrack: TrackInfo | null
-  isPlaying: boolean
-  progress: number
-  duration: number
-  volume: number
-  trackList: TrackInfo[]
-  likedTracks: TrackInfo[]
-  playTrack: (track: TrackInfo, streamUrl: string) => void
-  pauseTrack: () => void
-  resumeTrack: () => void
-  seek: (time: number) => void
-  setVolume: (volume: number) => void
-  nextTrack: () => void
-  prevTrack: () => void
-  setTrackList: (tracks: TrackInfo[]) => void
-  setLikedTracks: (tracks: TrackInfo[]) => void
-  toggleLike: (trackId: string, isLiked: boolean, track?: TrackInfo) => void
-}
+import { getTrackStreamUrl, postPlay } from '../api/audioApi'
+import type { TrackInfo, AudioContextType } from '../types/audio'
 
 const AudioContext = createContext<AudioContextType | undefined>(undefined)
 
@@ -40,15 +13,24 @@ export function AudioProvider({ children }: { children: ReactNode }) {
   const [volume, setVolumeState] = useState(1)
   const [trackList, setTrackListState] = useState<TrackInfo[]>([])
   const [likedTracks, setLikedTracksState] = useState<TrackInfo[]>([])
+  const [playsCount, setPlaysCount] = useState(0)
   const [audioUnlocked, setAudioUnlocked] = useState(false)
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const progressIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const nextTrackRef = useRef<(() => void) | null>(null)
+  const playTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const clearProgressInterval = useCallback(() => {
     if (progressIntervalRef.current) {
       clearInterval(progressIntervalRef.current)
       progressIntervalRef.current = null
+    }
+  }, [])
+
+  const clearPlayTimer = useCallback(() => {
+    if (playTimerRef.current) {
+      clearTimeout(playTimerRef.current)
+      playTimerRef.current = null
     }
   }, [])
 
@@ -69,7 +51,13 @@ export function AudioProvider({ children }: { children: ReactNode }) {
     }
 
     clearProgressInterval()
+    clearPlayTimer()
     setProgress(0)
+
+    // Reset plays count only when track actually changes
+    if (currentTrack && currentTrack.id !== track.id) {
+      setPlaysCount(0)
+    }
 
     try {
       const audio = new Audio(streamUrl)
@@ -87,6 +75,7 @@ export function AudioProvider({ children }: { children: ReactNode }) {
       audio.addEventListener('ended', () => {
         setIsPlaying(false)
         clearProgressInterval()
+        clearPlayTimer()
         if (nextTrackRef.current) {
           nextTrackRef.current()
         }
@@ -95,6 +84,7 @@ export function AudioProvider({ children }: { children: ReactNode }) {
       audio.addEventListener('error', (e) => {
         console.error('Audio playback error:', e)
         setIsPlaying(false)
+        clearPlayTimer()
       })
 
       await audio.play()
@@ -102,6 +92,23 @@ export function AudioProvider({ children }: { children: ReactNode }) {
       setIsPlaying(true)
       setAudioUnlocked(true)
       startProgressInterval()
+
+      // Start play timer to count play after 20 seconds (or immediately if track is shorter)
+      const token = localStorage.getItem('authToken')
+      if (token) {
+        // Get duration to check if track is shorter than 20 seconds
+        const duration = audio.duration
+        const delay = duration < 20 ? duration * 1000 : 20000
+
+        playTimerRef.current = setTimeout(async () => {
+          try {
+            await postPlay(track.id, 'TRACK', token)
+            incrementPlaysCount()
+          } catch (error) {
+            console.error('Failed to post play:', error)
+          }
+        }, delay)
+      }
     } catch (error) {
       console.error('Failed to play audio:', error)
       if (!audioUnlocked) {
@@ -109,26 +116,44 @@ export function AudioProvider({ children }: { children: ReactNode }) {
       }
       setIsPlaying(false)
     }
-  }, [clearProgressInterval, startProgressInterval, volume, audioUnlocked])
+  }, [clearProgressInterval, clearPlayTimer, startProgressInterval, volume, audioUnlocked])
 
   const pauseTrack = useCallback(() => {
     if (audioRef.current) {
       audioRef.current.pause()
       setIsPlaying(false)
       clearProgressInterval()
+      clearPlayTimer()
     }
-  }, [clearProgressInterval])
+  }, [clearProgressInterval, clearPlayTimer])
 
   const resumeTrack = useCallback(() => {
     if (audioRef.current) {
       audioRef.current.play().then(() => {
         setIsPlaying(true)
         startProgressInterval()
+
+        // Start play timer to count play after 20 seconds (or immediately if track is shorter)
+        const token = localStorage.getItem('authToken')
+        if (token && currentTrack) {
+          // Get duration to check if track is shorter than 20 seconds
+          const duration = audioRef.current?.duration || 0
+          const delay = duration < 20 ? duration * 1000 : 20000
+
+          playTimerRef.current = setTimeout(async () => {
+            try {
+              await postPlay(currentTrack.id, 'TRACK', token)
+              incrementPlaysCount()
+            } catch (error) {
+              console.error('Failed to post play:', error)
+            }
+          }, delay)
+        }
       }).catch((error) => {
         console.error('Failed to resume audio:', error)
       })
     }
-  }, [startProgressInterval])
+  }, [startProgressInterval, currentTrack])
 
   const seek = useCallback((time: number) => {
     if (audioRef.current) {
@@ -188,8 +213,12 @@ export function AudioProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
+  const incrementPlaysCount = useCallback(() => {
+    setPlaysCount((prev) => prev + 1)
+  }, [])
+
   return (
-    <AudioContext.Provider value={{ currentTrack, isPlaying, progress, duration, volume, trackList, likedTracks, playTrack, pauseTrack, resumeTrack, seek, setVolume, nextTrack, prevTrack, setTrackList, setLikedTracks, toggleLike }}>
+    <AudioContext.Provider value={{ currentTrack, isPlaying, progress, duration, volume, trackList, likedTracks, playsCount, playTrack, pauseTrack, resumeTrack, seek, setVolume, nextTrack, prevTrack, setTrackList, setLikedTracks, toggleLike, incrementPlaysCount }}>
       {children}
     </AudioContext.Provider>
   )

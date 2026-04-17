@@ -36,9 +36,9 @@ export function Navbar() {
         </div>
 
         <div className="nav-right">
-          <button type="button" className="ghost-btn">
+          <Link to="/upload" className="ghost-btn">
             Upload
-          </button>
+          </Link>
           {isAuthenticated ? (
             <>
               <Link className="ghost-btn" to="/profile">

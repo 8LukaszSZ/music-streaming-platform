@@ -41,7 +41,9 @@ namespace BL.Services
 
         public async Task<LocalTrack?> GetLocalTrackByIdAsync(Guid localTrackId)
         {
-            return await _trackRepository.GetByIdAsync(localTrackId);
+            return await _trackRepository.GetLocalTracks()
+                .Include(t => t.User)
+                .FirstOrDefaultAsync(t => t.Id == localTrackId);
         }
         public async Task<List<LocalTrack>> SearchTracksAsync(string query, Guid? viewerUserId, bool isAdmin)
         {

@@ -53,6 +53,7 @@ namespace Models.DTOs.Interactions
         public Guid? ParentCommentId { get; set; }
         public string Content { get; set; } = string.Empty;
         public DateTime CreatedAt { get; set; }
+        public bool IsDeleted { get; set; }
         public UserLiteDto User { get; set; } = new UserLiteDto();
         public List<ContentCommentResponseDto> Replies { get; set; } = new();
     }

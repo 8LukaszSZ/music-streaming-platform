@@ -95,7 +95,32 @@ namespace BL.Services
 
         public async Task<ContentComment?> DeleteCommentAsync(Guid commentId)
         {
-            return await _commentRepository.DeleteAsync(commentId);
+            var comment = await _commentRepository.GetByIdAsync(commentId);
+            if (comment == null)
+                return null;
+
+            if (comment.ParentCommentId.HasValue)
+            {
+                return await _commentRepository.DeleteAsync(commentId);
+            }
+            else
+            {
+                var hasReplies = await _commentRepository.GetContentComments()
+                    .AnyAsync(cc => cc.ParentCommentId == commentId);
+
+                if (!hasReplies)
+                {
+                    return await _commentRepository.DeleteAsync(commentId);
+                }
+                else
+                {
+                    comment.IsDeleted = true;
+                    comment.DeletedAt = DateTime.UtcNow;
+                    comment.Content = "Deleted comment";
+
+                    return await _commentRepository.UpdateAsync(comment);
+                }
+            }
         }
 
         public async Task<bool> UserOwnsCommentAsync(Guid userId, Guid commentId)

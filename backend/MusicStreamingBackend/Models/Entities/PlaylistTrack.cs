@@ -16,6 +16,7 @@ namespace Models.Entities
         //public string SourceType { get; set; } = "LOCAL";
         public Guid? LocalTrackId { get; set; }
         public string? SpotifyTrackId { get; set; }
+        public int Position { get; set; }
 
         [ForeignKey("PlaylistId")]
         public Playlist? Playlist { get; set; }

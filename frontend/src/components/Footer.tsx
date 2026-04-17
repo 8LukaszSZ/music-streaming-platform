@@ -1,8 +1,5 @@
 import { Link } from 'react-router-dom'
-
-type FooterProps = {
-  isAuthenticated: boolean
-}
+import type { FooterProps } from '../types/component'
 
 export function Footer({ isAuthenticated }: FooterProps) {
   return (

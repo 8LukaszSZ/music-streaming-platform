@@ -25,6 +25,7 @@ namespace BL.Services
             return await _playlistTrackRepository.GetPlaylistTracks()
                 .Where(pt => pt.PlaylistId == playlistId)
                 .Include(pt => pt.LocalTrack)
+                .OrderBy(pt => pt.Position)
                 .ToListAsync();
         }
 
@@ -44,6 +45,13 @@ namespace BL.Services
 
             if (playlistTrack.Id == Guid.Empty)
                 playlistTrack.Id = Guid.NewGuid();
+
+            // Set position to the end of the playlist
+            var existingTracks = await _playlistTrackRepository.GetPlaylistTracks()
+                .Where(pt => pt.PlaylistId == playlistTrack.PlaylistId)
+                .ToListAsync();
+            var maxPosition = existingTracks.Any() ? existingTracks.Max(pt => pt.Position) : 0;
+            playlistTrack.Position = maxPosition + 1;
 
             return await _playlistTrackRepository.AddAsync(playlistTrack);
         }

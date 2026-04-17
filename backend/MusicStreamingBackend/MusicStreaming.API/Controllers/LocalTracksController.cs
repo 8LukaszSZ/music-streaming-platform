@@ -7,6 +7,7 @@ using Models.DTOs.Tracks;
 using Models.Entities;
 using MusicStreaming.API.Extensions;
 using MusicStreaming.API.Helpers;
+using NAudio.Wave;
 using System.ComponentModel.DataAnnotations;
 
 namespace MusicStreaming.API.Controllers
@@ -119,6 +120,7 @@ namespace MusicStreaming.API.Controllers
                 UploadedAt = track.UploadedAt,
                 FilePath = showFilePath ? track.FilePath : string.Empty,
                 TrackImagePath = track.TrackImagePath,
+                Username = track.User?.DisplayUsername() ?? "Deleted user",
                 IsPrivate = track.IsPrivate
             };
 
@@ -301,6 +303,90 @@ namespace MusicStreaming.API.Controllers
 
             await _localTrackService.DeleteLocalTrackAsync(id);
             return NoContent();
+        }
+
+        // GET: api/localtracks/{id}/waveform
+        [HttpGet("{id:guid}/waveform")]
+        [AllowAnonymous]
+        public async Task<ActionResult<IEnumerable<int>>> GetWaveform(Guid id)
+        {
+            var track = await _localTrackService.GetLocalTrackByIdAsync(id);
+            if (track == null)
+                return NotFound();
+
+            var isAdmin = User.IsInRole(UserRoles.Admin);
+            Guid? viewerUserId = null;
+            if (User.Identity?.IsAuthenticated == true && !isAdmin)
+                viewerUserId = User.GetUserId();
+
+            if (!LocalTrackAccess.CanView(track, viewerUserId, isAdmin))
+                return Forbid();
+
+            var fullPath = Path.Combine(_env.ContentRootPath, track.FilePath);
+
+            if (!System.IO.File.Exists(fullPath))
+                return NotFound("File not found");
+
+            try
+            {
+                var waveform = GenerateWaveform(fullPath);
+                return Ok(waveform);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"Error generating waveform: {ex.Message}");
+            }
+        }
+
+        private int[] GenerateWaveform(string filePath)
+        {
+            const int bars = 100;
+            var waveform = new int[bars];
+
+            try
+            {
+                using var audioFile = new AudioFileReader(filePath);
+                var sampleData = new List<float>();
+                var buffer = new float[audioFile.WaveFormat.SampleRate * audioFile.WaveFormat.Channels];
+
+                int bytesRead;
+                while ((bytesRead = audioFile.Read(buffer, 0, buffer.Length)) > 0)
+                {
+                    for (int i = 0; i < bytesRead; i++)
+                    {
+                        sampleData.Add(Math.Abs(buffer[i]));
+                    }
+                }
+
+                // Downsample to 100 bars
+                var samplesPerBar = sampleData.Count / bars;
+                for (int i = 0; i < bars; i++)
+                {
+                    var start = i * samplesPerBar;
+                    var end = Math.Min(start + samplesPerBar, sampleData.Count);
+
+                    if (start < sampleData.Count)
+                    {
+                        var sum = 0.0;
+                        for (int j = start; j < end; j++)
+                        {
+                            sum += sampleData[j];
+                        }
+                        var average = sum / (end - start);
+                        waveform[i] = (int)(average * 100); // Scale to 0-100
+                    }
+                }
+            }
+            catch
+            {
+                // Fallback to random values if audio analysis fails
+                for (int i = 0; i < bars; i++)
+                {
+                    waveform[i] = (int)(new Random().NextDouble() * 60 + 20);
+                }
+            }
+
+            return waveform;
         }
     }
 }

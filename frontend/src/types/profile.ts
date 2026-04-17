@@ -32,3 +32,35 @@ export type UserActivityDto = {
   message?: string
   createdAt: string
 }
+
+export type Playlist = {
+  id: string
+  userId: string
+  name: string
+  description?: string
+  isPublic: boolean
+  createdAt: string
+  playlistImagePath?: string
+  user?: {
+    id: string
+    username: string
+    profileImagePath?: string
+  }
+}
+
+export type PlaylistTrack = {
+  id: string
+  playlistId: string
+  localTrackId: string
+}
+
+export type PlaylistTrackInfo = {
+  id: string
+  userId: string
+  title: string
+  duration: number
+  trackImagePath?: string
+  username?: string
+  isPrivate: boolean
+  playlistTrackId?: string
+}

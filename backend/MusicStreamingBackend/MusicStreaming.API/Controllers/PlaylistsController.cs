@@ -122,7 +122,7 @@ namespace MusicStreaming.API.Controllers
                         && pt.LocalTrack.User != null
                         && !pt.LocalTrack.User.IsDeleted
                         && LocalTrackAccess.CanView(pt.LocalTrack, viewerUserId, isAdmin))
-                    .OrderBy(pt => pt.Id)
+                    .OrderBy(pt => pt.Position)
                     .Select(pt => new PlaylistTrackSearchItemDto
                     {
                         PlaylistTrackId = pt.Id,

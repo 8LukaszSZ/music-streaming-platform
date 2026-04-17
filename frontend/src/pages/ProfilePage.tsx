@@ -1,55 +1,42 @@
 import { Navbar } from '../components/Navbar'
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { ProfileMediaTile } from '../components/ProfileMediaTile'
 import { getApiOrigin } from '../api/httpClient'
 import { getProfileData, getUserProfileData, updateProfileData } from '../services/profileService'
-import { likeTrack, unlikeTrack } from '../api/audioApi'
+import { likeTrack, unlikeTrack, deleteTrack } from '../api/audioApi'
+import { followUser, unfollowUser, deletePlaylist } from '../api/profileApi'
 import type { PlaylistDto, TrackDto, UserActivityDto, UserLiteDto } from '../types/profile'
+import type { ProfileTab } from '../types/page'
 import { Footer } from '../components/Footer'
 import { useAudio } from '../contexts/AudioContext'
-
-type ProfileTab = 'tracks' | 'playlists' | 'shared'
 
 export function ProfilePage() {
   const navigate = useNavigate()
   const { userId } = useParams<{ userId?: string }>()
   const isAuthenticated = Boolean(localStorage.getItem('authToken'))
-  const { setTrackList, setLikedTracks, toggleLike, likedTracks: contextLikedTracks } = useAudio()
+  const { setTrackList, setLikedTracks, toggleLike, likedTracks: contextLikedTracks, playTrack } = useAudio()
   const [activeTab, setActiveTab] = useState<ProfileTab>('tracks')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null)
   const [avatarLoadFailed, setAvatarLoadFailed] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
   const [peopleModal, setPeopleModal] = useState<'followers' | 'following' | null>(null)
   const [editBio, setEditBio] = useState('')
   const [selectedImage, setSelectedImage] = useState<File | undefined>(undefined)
   const [saving, setSaving] = useState(false)
+  const [isFollowing, setIsFollowing] = useState(false)
 
-  // Fetch current user's liked tracks on mount to ensure contextLikedTracks is always populated
-  useEffect(() => {
-    const fetchCurrentUserLikedTracks = async () => {
-      const token = localStorage.getItem('authToken')
-      if (!token) return
-
-      try {
-        const currentUserData = await getProfileData()
-        setLikedTracks(
-          currentUserData.likedTracks.map((track) => ({
-            id: track.id,
-            title: track.title,
-            subtitle: track.username || 'Deleted User',
-            imageUrl: track.trackImagePath ? resolveImage(track.trackImagePath) : undefined,
-            duration: track.duration,
-          }))
-        )
-      } catch (error) {
-        console.error('Failed to fetch current user liked tracks:', error)
-      }
+  // Decode JWT to get current user ID before any fetch
+  const currentUserId = useMemo(() => {
+    const token = localStorage.getItem('authToken')
+    if (!token) return null
+    try {
+      const payload = JSON.parse(atob(token.split('.')[1]))
+      return payload.nameid || payload.sub || null
+    } catch {
+      return null
     }
-
-    fetchCurrentUserLikedTracks()
   }, [])
 
   const [profile, setProfile] = useState<{
@@ -85,17 +72,6 @@ export function ProfilePage() {
         const data = userId ? await getUserProfileData(userId) : await getProfileData()
         setProfile(data)
 
-        // Decode JWT to get current user ID
-        const token = localStorage.getItem('authToken')
-        if (token) {
-          try {
-            const payload = JSON.parse(atob(token.split('.')[1]))
-            setCurrentUserId(payload.nameid || payload.sub || null)
-          } catch {
-            setCurrentUserId(null)
-          }
-        }
-        setProfile(data)
         // Only set contextLikedTracks when viewing own profile
         const isOwnProfile = !userId || userId === currentUserId
         if (isOwnProfile) {
@@ -106,6 +82,7 @@ export function ProfilePage() {
               subtitle: track.username || 'Deleted User',
               imageUrl: track.trackImagePath ? resolveImage(track.trackImagePath) : undefined,
               duration: track.duration,
+              userId: track.userId,
             }))
           )
         }
@@ -117,8 +94,15 @@ export function ProfilePage() {
           subtitle: track.username || 'Deleted User',
           imageUrl: track.trackImagePath ? resolveImage(track.trackImagePath) : undefined,
           duration: track.duration,
+          userId: track.userId,
         }))
         setTrackList(trackList)
+
+        // Check if current user is following this profile user
+        if (userId && currentUserId) {
+          const isUserFollowing = data.followers.some((f: UserLiteDto) => f.id === currentUserId)
+          setIsFollowing(isUserFollowing)
+        }
       } catch (loadError) {
         const message = loadError instanceof Error ? loadError.message : 'Failed to load profile.'
         setError(message)
@@ -131,7 +115,7 @@ export function ProfilePage() {
     }
 
     void load()
-  }, [navigate, userId, setTrackList])
+  }, [navigate, userId, currentUserId, setTrackList])
 
   const sharedItems = useMemo(() => {
     if (!profile) return []
@@ -142,12 +126,173 @@ export function ProfilePage() {
     }))
   }, [profile])
 
-  const resolveImage = (path?: string) => {
+  const likedTrackIds = useMemo(() => {
+    return new Set(contextLikedTracks.map((track) => track.id))
+  }, [contextLikedTracks])
+
+  const resolveImage = useCallback((path?: string) => {
     if (!path) return ''
     if (path.startsWith('http://') || path.startsWith('https://')) return path
 
     const normalizedPath = path.replaceAll('\\', '/').replace(/^wwwroot\//, '')
     return `${getApiOrigin()}${normalizedPath.startsWith('/') ? normalizedPath : `/${normalizedPath}`}`
+  }, [])
+
+  const handlePlayTrack = useCallback((_trackId: string) => {
+    if (!profile) return
+
+    let trackList: any[] = []
+
+    if (activeTab === 'tracks') {
+      trackList = profile.tracks.map((track) => ({
+        id: track.id,
+        title: track.title,
+        subtitle: track.username || 'Deleted User',
+        imageUrl: track.trackImagePath ? resolveImage(track.trackImagePath) : undefined,
+        duration: track.duration,
+        userId: track.userId,
+      }))
+    }
+
+    setTrackList(trackList)
+  }, [profile, activeTab, resolveImage, setTrackList])
+
+  const handlePlayLikedTrack = useCallback((_trackId: string) => {
+    const isOwnProfile = !userId || userId === currentUserId
+    let trackList: any[] = []
+
+    if (isOwnProfile) {
+      trackList = contextLikedTracks.map((track) => ({
+        id: track.id,
+        title: track.title,
+        subtitle: track.subtitle,
+        imageUrl: track.imageUrl,
+        duration: track.duration,
+        userId: track.userId,
+      }))
+    } else {
+      trackList = profile.likedTracks.map((track) => ({
+        id: track.id,
+        title: track.title,
+        subtitle: track.username || 'Deleted User',
+        imageUrl: track.trackImagePath ? resolveImage(track.trackImagePath) : undefined,
+        duration: track.duration,
+        userId: track.userId,
+      }))
+    }
+
+    setTrackList(trackList)
+  }, [contextLikedTracks, profile, userId, currentUserId, resolveImage, setTrackList])
+
+  const handleFollowToggle = async () => {
+    if (!userId) return
+
+    const token = localStorage.getItem('authToken')
+    if (!token) {
+      alert('You need to log in to follow users')
+      return
+    }
+
+    try {
+      if (isFollowing) {
+        await unfollowUser(userId, token)
+        setIsFollowing(false)
+      } else {
+        await followUser(userId, token)
+        setIsFollowing(true)
+      }
+
+      // Refetch profile data to get updated followers list
+      const data = userId ? await getUserProfileData(userId) : await getProfileData()
+      setProfile(data)
+
+      // Update isFollowing status
+      if (userId && currentUserId) {
+        const isUserFollowing = data.followers.some((f: UserLiteDto) => f.id === currentUserId)
+        setIsFollowing(isUserFollowing)
+      }
+    } catch (error) {
+      console.error('Failed to toggle follow:', error)
+      alert('Failed to update follow status')
+    }
+  }
+
+  const handlePlayPlaylist = async (playlistId: string) => {
+    const token = localStorage.getItem('authToken')
+    if (!token) {
+      alert('You need to log in to play playlists')
+      return
+    }
+
+    try {
+      const response = await fetch(`${getApiOrigin()}/api/playlists/${playlistId}/tracks`, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      if (response.ok) {
+        const playlistTracks: any[] = await response.json()
+        if (playlistTracks.length > 0) {
+          // Fetch all track details
+          const trackDetailsList = await Promise.all(
+            playlistTracks.map((pt) =>
+              fetch(`${getApiOrigin()}/api/LocalTracks/${pt.localTrackId}`, {
+                headers: { Authorization: `Bearer ${token}` }
+              }).then(res => res.json())
+            )
+          )
+
+          const trackList = trackDetailsList.map((track) => ({
+            id: track.id,
+            title: track.title,
+            subtitle: track.username || 'Deleted User',
+            imageUrl: track.trackImagePath ? resolveImage(track.trackImagePath) : undefined,
+            duration: track.duration,
+            userId: track.userId,
+          }))
+          setTrackList(trackList)
+
+          // Play first track
+          const firstTrack = trackDetailsList[0]
+          playTrack(
+            {
+              id: firstTrack.id,
+              title: firstTrack.title,
+              subtitle: firstTrack.username || 'Deleted User',
+              imageUrl: firstTrack.trackImagePath ? resolveImage(firstTrack.trackImagePath) : undefined,
+              userId: firstTrack.userId,
+              duration: firstTrack.duration,
+            },
+            `${getApiOrigin()}/api/LocalTracks/${firstTrack.id}/stream`
+          )
+        }
+      }
+    } catch (error) {
+      console.error('Failed to play playlist:', error)
+      alert('Failed to play playlist')
+    }
+  }
+
+  const handleEditPlaylist = (playlistId: string) => {
+    navigate(`/playlist/${playlistId}/edit`)
+  }
+
+  const handleDeletePlaylist = async (playlistId: string) => {
+    if (!confirm('Are you sure you want to delete this playlist?')) return
+
+    const token = localStorage.getItem('authToken')
+    if (!token) {
+      alert('You need to log in to delete playlists')
+      return
+    }
+
+    try {
+      await deletePlaylist(playlistId, token)
+      // Refetch profile data to update playlists list
+      const data = userId ? await getUserProfileData(userId) : await getProfileData()
+      setProfile(data)
+    } catch (error) {
+      console.error('Failed to delete playlist:', error)
+      alert('Failed to delete playlist')
+    }
   }
 
   const handleLikeToggle = async (trackId: string, isLiked: boolean) => {
@@ -177,6 +322,7 @@ export function ProfilePage() {
           subtitle: trackInfo?.subtitle || trackDto?.username || 'Deleted User',
           imageUrl: trackInfo?.imageUrl || (trackDto?.trackImagePath ? resolveImage(trackDto.trackImagePath) : undefined),
           duration: track.duration,
+          userId: trackDto?.userId || trackInfo?.userId,
         })
         // Update local profile state if viewing own profile
         if (isOwnProfile) {
@@ -199,6 +345,28 @@ export function ProfilePage() {
     } catch (error) {
       console.error('Failed to toggle like:', error)
       alert('Failed to like track')
+    }
+  }
+
+  const handleDelete = async (trackId: string) => {
+    if (!profile) return
+
+    const token = localStorage.getItem('authToken')
+    if (!token) {
+      alert('You need to log in to delete tracks')
+      return
+    }
+
+    try {
+      await deleteTrack(trackId, token)
+      // Remove track from local profile state
+      setProfile({
+        ...profile,
+        tracks: profile.tracks.filter((t) => t.id !== trackId),
+      })
+    } catch (error) {
+      console.error('Failed to delete track:', error)
+      alert('Failed to delete track')
     }
   }
 
@@ -231,7 +399,34 @@ export function ProfilePage() {
       <Navbar />
 
       <section className="app-shell profile-layout">
-        {loading ? <p className="track-meta">Loading profile...</p> : null}
+        {loading ? (
+          <div className="profile-skeleton">
+            <div className="profile-header-skeleton">
+              <div className="profile-avatar-skeleton"></div>
+              <div className="profile-header-content-skeleton">
+                <div className="skeleton-text skeleton-title"></div>
+                <div className="skeleton-text skeleton-subtitle"></div>
+                <div className="skeleton-text skeleton-stats"></div>
+              </div>
+            </div>
+            <div className="profile-tabs-skeleton">
+              <div className="skeleton-tab"></div>
+              <div className="skeleton-tab"></div>
+              <div className="skeleton-tab"></div>
+            </div>
+            <div className="profile-list-skeleton">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="profile-media-tile-skeleton">
+                  <div className="skeleton-image"></div>
+                  <div className="skeleton-content">
+                    <div className="skeleton-text skeleton-title"></div>
+                    <div className="skeleton-text skeleton-subtitle"></div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null}
         {error ? <p className="message error">{error}</p> : null}
 
         {profile && !loading ? (
@@ -261,7 +456,25 @@ export function ProfilePage() {
                     </button>
                   </div>
                 </div>
-                {userId ? null : (
+                {userId && userId !== currentUserId ? (
+                  <div className="profile-header-actions">
+                    <button
+                      type="button"
+                      className="solid-btn"
+                      onClick={handleFollowToggle}
+                      style={{ marginRight: '8px', minWidth: '100px' }}
+                    >
+                      {isFollowing ? 'Unfollow' : 'Follow'}
+                    </button>
+                    <button
+                      type="button"
+                      className="ghost-btn"
+                      onClick={() => navigate('/messages')}
+                    >
+                      Message
+                    </button>
+                  </div>
+                ) : (
                   <button type="button" className="ghost-btn profile-edit-btn" onClick={handleStartEdit}>
                     Edit profile
                   </button>
@@ -296,15 +509,21 @@ export function ProfilePage() {
                         trailingText={`${Math.floor(track.duration / 60)}:${String(track.duration % 60).padStart(2, '0')}`}
                         trackId={track.id}
                         canPlay={!track.isPrivate || track.userId === currentUserId}
-                        isLiked={isAuthenticated ? contextLikedTracks.some((liked) => liked.id === track.id) : false}
+                        isLiked={isAuthenticated ? likedTrackIds.has(track.id) : false}
                         onLikeToggle={isAuthenticated ? handleLikeToggle : undefined}
+                        userId={track.userId}
+                        isPrivate={track.isPrivate}
+                        isCreator={track.userId === currentUserId}
+                        onDelete={track.userId === currentUserId ? handleDelete : undefined}
+                        onEdit={track.userId === currentUserId ? (trackId) => navigate(`/track/${trackId}/edit`) : undefined}
+                        onPlay={handlePlayTrack}
                       />
                     ))}
                     {profile.tracks.length === 0 ? <p className="track-meta">No tracks yet.</p> : null}
                     <div className="profile-cta">
                       <p className="profile-cta-title">Share your creativity with others.</p>
                       <p className="track-meta">Upload more tracks and let people discover your sound.</p>
-                      <button type="button" className="solid-btn" onClick={() => navigate('/stream')}>
+                      <button type="button" className="solid-btn" onClick={() => navigate('/upload')}>
                         Upload a track
                       </button>
                     </div>
@@ -319,14 +538,20 @@ export function ProfilePage() {
                         title={playlist.name}
                         subtitle={playlist.description || (playlist.isPublic ? 'Public playlist' : 'Private playlist')}
                         imageUrl={resolveImage(playlist.playlistImagePath)}
-                        trailingText="Playlist"
+                        playlistId={playlist.id}
+                        canPlay={true}
+                        onPlay={() => handlePlayPlaylist(playlist.id)}
+                        isCreator={playlist.userId === currentUserId}
+                        onEditPlaylist={handleEditPlaylist}
+                        onDeletePlaylist={handleDeletePlaylist}
+                        isPrivate={!playlist.isPublic}
                       />
                     ))}
                     {profile.playlists.length === 0 ? <p className="track-meta">No playlists yet.</p> : null}
                     <div className="profile-cta">
                       <p className="profile-cta-title">Create more playlists. Share your taste.</p>
                       <p className="track-meta">Organize tracks into moods and collections for others to explore.</p>
-                      <button type="button" className="solid-btn" onClick={() => navigate('/stream')}>
+                      <button type="button" className="solid-btn" onClick={() => navigate('/playlist/create')}>
                         Create a playlist
                       </button>
                     </div>
@@ -390,8 +615,10 @@ export function ProfilePage() {
                         trailingText={track.duration ? `${Math.floor(track.duration / 60)}:${String(track.duration % 60).padStart(2, '0')}` : undefined}
                         trackId={track.id}
                         canPlay={true}
-                        isLiked={isAuthenticated ? contextLikedTracks.some((liked) => liked.id === track.id) : false}
+                        isLiked={isAuthenticated ? likedTrackIds.has(track.id) : false}
                         onLikeToggle={isAuthenticated ? handleLikeToggle : undefined}
+                        userId={track.userId}
+                        onPlay={handlePlayLikedTrack}
                       />
                     ))
                   )
@@ -408,8 +635,11 @@ export function ProfilePage() {
                         trailingText={`${Math.floor(track.duration / 60)}:${String(track.duration % 60).padStart(2, '0')}`}
                         trackId={track.id}
                         canPlay={true}
-                        isLiked={isAuthenticated ? profile.likedTracks.some((liked) => liked.id === track.id) : false}
+                        isLiked={isAuthenticated ? likedTrackIds.has(track.id) : false}
                         onLikeToggle={isAuthenticated ? handleLikeToggle : undefined}
+                        userId={track.userId}
+                        isPrivate={track.isPrivate}
+                        onPlay={handlePlayLikedTrack}
                       />
                     ))
                   )

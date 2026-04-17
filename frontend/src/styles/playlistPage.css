@@ -1,0 +1,132 @@
+.playlist-page {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 40px 20px;
+}
+
+.playlist-page-header {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  gap: 40px;
+  margin-bottom: 20px;
+  align-items: start;
+  padding-bottom: 40px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.playlist-page-left {
+  display: flex;
+  justify-content: center;
+}
+
+.playlist-page-image {
+  width: 280px;
+  height: 280px;
+  object-fit: cover;
+  border-radius: 8px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+
+.playlist-page-image.placeholder {
+  width: 280px;
+  height: 280px;
+  background: linear-gradient(135deg, #9e77ff 0%, #6a5acd 100%);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 80px;
+  font-weight: bold;
+  color: white;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+
+.playlist-page-right {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.playlist-page-title {
+  font-size: 48px;
+  font-weight: bold;
+  color: var(--text-h);
+  margin: 0;
+  line-height: 1.2;
+}
+
+.playlist-page-description {
+  font-size: 16px;
+  color: var(--text-m);
+  margin: 0;
+  line-height: 1.5;
+}
+
+.playlist-page-meta {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: 8px;
+  font-size: 14px;
+  color: var(--text-m);
+}
+
+.playlist-page-author {
+  color: var(--text-h);
+  font-weight: 500;
+}
+
+.playlist-page-track-count,
+.playlist-page-duration {
+  color: var(--text-m);
+}
+
+.playlist-page-private-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 12px;
+  background: rgba(158, 119, 255, 0.15);
+  border: 1px solid rgba(158, 119, 255, 0.3);
+  border-radius: 20px;
+  color: #9e77ff;
+  font-size: 14px;
+  font-weight: 500;
+  width: fit-content;
+}
+
+.playlist-page-tracks {
+  margin-top: 20px;
+}
+
+.playlist-page-tracks-title {
+  font-size: 24px;
+  font-weight: bold;
+  color: var(--text-h);
+  margin-bottom: 20px;
+}
+
+@media (max-width: 768px) {
+  .playlist-page-header {
+    grid-template-columns: 1fr;
+    gap: 24px;
+  }
+
+  .playlist-page-left {
+    justify-content: center;
+  }
+
+  .playlist-page-image {
+    width: 240px;
+    height: 240px;
+  }
+
+  .playlist-page-image.placeholder {
+    width: 240px;
+    height: 240px;
+    font-size: 68px;
+  }
+
+  .playlist-page-title {
+    font-size: 32px;
+  }
+}
