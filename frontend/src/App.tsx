@@ -8,6 +8,7 @@ import './styles/trackPage.css'
 import './styles/uploadPage.css'
 import './styles/imageCropper.css'
 import './styles/playlistPage.css'
+import './styles/chatPage.css'
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { HomePage } from './pages/HomePage'
 import { LoginPage } from './pages/LoginPage'
@@ -20,6 +21,10 @@ import { EditTrackPage } from './pages/EditTrackPage'
 import { PlaylistPage } from './pages/PlaylistPage'
 import { CreatePlaylistPage } from './pages/CreatePlaylistPage'
 import { EditPlaylistPage } from './pages/EditPlaylistPage'
+import { AllCommentsPage } from './pages/AllCommentsPage'
+import { AllLikedTracksPage } from './pages/AllLikedTracksPage'
+import { AllFansAlsoLikePage } from './pages/AllFansAlsoLikePage'
+import { ChatPage } from './pages/ChatPage'
 import { AudioProvider } from './contexts/AudioContext'
 import { AudioPlayer } from './components/AudioPlayer'
 import { PageTransition } from './routes/PageTransition'
@@ -39,6 +44,11 @@ function App() {
           <Route path="/playlist/:playlistId" element={<PlaylistPage />} />
           <Route path="/playlist/:playlistId/edit" element={<EditPlaylistPage />} />
           <Route path="/playlist/create" element={<CreatePlaylistPage />} />
+          <Route path="/profile/:userId/comments" element={<AllCommentsPage />} />
+          <Route path="/profile/:userId/liked" element={<AllLikedTracksPage />} />
+          <Route path="/profile/:userId/fans-also-like" element={<AllFansAlsoLikePage />} />
+          <Route path="/chat" element={<ChatPage />} />
+          <Route path="/chat/:userId" element={<ChatPage />} />
           <Route path="/upload" element={<UploadPage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />

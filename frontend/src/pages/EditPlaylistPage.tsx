@@ -88,7 +88,6 @@ export function EditPlaylistPage() {
     try {
       const token = localStorage.getItem('authToken') || undefined
 
-      // Update playlist details
       await updatePlaylist(
         playlistId!,
         token,
@@ -99,7 +98,6 @@ export function EditPlaylistPage() {
         }
       )
 
-      // Update visibility if changed
       await updatePlaylistVisibility(playlistId!, isPublic, token)
 
       navigate(`/playlist/${playlistId}`)

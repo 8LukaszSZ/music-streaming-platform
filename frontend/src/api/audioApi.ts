@@ -48,6 +48,10 @@ export async function removeTrackFromPlaylist(playlistId: string, playlistTrackI
   })
 }
 
+export function searchTracks(query: string, token?: string) {
+  return request<any[]>(`/localtracks/search?query=${encodeURIComponent(query)}`, { token })
+}
+
 export function getComments(contentId: string, contentType: string = 'TRACK', token?: string) {
   return request(`/ContentComments?contentId=${contentId}&contentType=${contentType}`, {
     method: 'GET',
@@ -66,6 +70,18 @@ export function createComment(contentId: string, content: string, parentCommentI
     },
     token,
   })
+}
+
+export function getLatestCommentsForUser(userId: string, count: number = 3, token?: string) {
+  return request<any[]>(`/ContentComments/latest?userId=${userId}&count=${count}`, { token })
+}
+
+export function getFansAlsoLike(artistUserId: string, count: number = 5, token?: string) {
+  return request<any[]>(`/LocalTracks/recommendations?artistUserId=${artistUserId}&count=${count}`, { token })
+}
+
+export function getLikedTracksByUser(userId: string, token?: string) {
+  return request<any[]>(`/ContentLikes/user/${userId}/tracks`, { token })
 }
 
 export function deleteComment(commentId: string, token?: string) {
@@ -152,5 +168,21 @@ export async function addTrackToPlaylist(playlistId: string, trackId: string, to
     method: 'POST',
     token,
     body: { localTrackId: trackId },
+  })
+}
+
+export async function likePlaylist(playlistId: string, token?: string) {
+  return request('/contentlikes', {
+    method: 'POST',
+    token,
+    body: { contentId: playlistId, contentType: 'PLAYLIST' },
+  })
+}
+
+export async function unlikePlaylist(playlistId: string, token?: string) {
+  return request('/contentlikes', {
+    method: 'DELETE',
+    token,
+    body: { contentId: playlistId, contentType: 'PLAYLIST' },
   })
 }

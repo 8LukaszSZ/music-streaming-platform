@@ -14,6 +14,7 @@ namespace IBL
         Task<List<ContentLike>> GetLikesForContentAsync(Guid contentId, string contentType);
         Task<List<ContentLike>> GetLikedContentByUserAsync(Guid userId, string contentType);
         Task<List<LocalTrack>> GetLikedTracksByUserAsync(Guid userId);
+        Task<List<Playlist>> GetLikedPlaylistsByUserAsync(Guid userId);
 
         Task<ContentLike> LikeContentAsync(Guid userId, Guid contentId, string contentType);
         Task<bool> UnlikeContentAsync(Guid userId, Guid contentId, string contentType);

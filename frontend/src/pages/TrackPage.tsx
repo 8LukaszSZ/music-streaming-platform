@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useMemo, useState, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Navbar } from '../components/Navbar'
 import { Footer } from '../components/Footer'
 import { Waveform } from '../components/Waveform'
 import { useAudio } from '../contexts/AudioContext'
 import { getApiOrigin } from '../api/httpClient'
-import { likeTrack, unlikeTrack, getTrackById, getTrackStreamUrl, getWaveform, getComments, createComment, deleteComment, getCommentsCount, getLikesCount, getPlaysCount } from '../api/audioApi'
+import { likeTrack, unlikeTrack, getTrackById, getTrackStreamUrl, getWaveform, getComments, createComment, deleteComment, getCommentsCount, getLikesCount, getPlaysCount, addTrackToPlaylist } from '../api/audioApi'
+import { getMyPlaylists } from '../api/profileApi'
 
 export function TrackPage() {
   const { trackId } = useParams<{ trackId: string }>()
@@ -23,9 +25,12 @@ export function TrackPage() {
   const [stats, setStats] = useState({ plays: 0, likes: 0, comments: 0 })
   const [previousLiked, setPreviousLiked] = useState(false)
   const [previousPlaysCount, setPreviousPlaysCount] = useState(0)
+  const [showPlaylistModal, setShowPlaylistModal] = useState(false)
+  const [playlists, setPlaylists] = useState<any[]>([])
+  const [loadingPlaylists, setLoadingPlaylists] = useState(false)
+  const [playlistsWithTrack, setPlaylistsWithTrack] = useState<Set<string>>(new Set())
   const wasPlayingRef = useRef(false)
 
-  // Decode JWT to get current user ID before any fetch
   const currentUserId = useMemo(() => {
     const token = localStorage.getItem('authToken')
     if (!token) return null
@@ -59,7 +64,7 @@ export function TrackPage() {
 
         setTrack(data)
         setWaveformBars(waveform as number[])
-        setComments(commentsData as any[])
+        setComments((commentsData as any[]).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()))
         setStats({
           plays: (plays as number) || 0,
           likes: (likes as number) || 0,
@@ -75,7 +80,6 @@ export function TrackPage() {
     loadAll()
   }, [trackId])
 
-  // Handle pending seek after track loads
   useEffect(() => {
     if (pendingSeekPercent !== null && currentTrack?.id === trackId && duration > 0) {
       const newTime = pendingSeekPercent * duration
@@ -102,7 +106,6 @@ export function TrackPage() {
       replies: [],
     }
 
-    // Optimistic update
     setComments(prev => [tempComment, ...prev])
     setNewComment('')
     setStats(prev => ({ ...prev, comments: prev.comments + 1 }))
@@ -134,7 +137,6 @@ export function TrackPage() {
       createdAt: new Date().toISOString(),
     }
 
-    // Optimistic update
     setComments(prev => prev.map(c => {
       if (c.id === parentCommentId) {
         return {
@@ -186,21 +188,40 @@ export function TrackPage() {
       return
     }
 
-    // Optimistic update
-    setComments(prev => prev.filter(c => c.id !== commentId))
-    setStats(prev => ({ ...prev, comments: Math.max(0, prev.comments - 1) }))
+    const isMainComment = comments.some(c => c.id === commentId)
+    const mainComment = comments.find(c => c.id === commentId)
+    const hasReplies = mainComment?.replies && mainComment.replies.length > 0
+
+    if (isMainComment && hasReplies) {
+      setComments(prev => prev.map(c => {
+        if (c.id === commentId) {
+          return { ...c, content: 'Deleted comment' }
+        }
+        return c
+      }))
+    } else if (isMainComment && !hasReplies) {
+      setComments(prev => prev.filter(c => c.id !== commentId))
+    } else {
+      setComments(prev => prev.map(c => {
+        if (c.replies) {
+          return {
+            ...c,
+            replies: c.replies.filter((r: any) => r.id !== commentId)
+          }
+        }
+        return c
+      }))
+    }
 
     try {
       await deleteComment(commentId, token)
     } catch (err) {
       console.error('Failed to delete comment:', err)
-      setStats(prev => ({ ...prev, comments: prev.comments + 1 }))
-      // Refetch on error
       const data = await getComments(trackId, 'TRACK', token) as any[]
       setComments(data)
       alert('Failed to delete comment')
     }
-  }, [trackId])
+  }, [trackId, comments])
 
   const isAuthenticated = useMemo(() => Boolean(localStorage.getItem('authToken')), [])
   const likedTrackIds = useMemo(() => new Set(likedTracks.map((t) => t.id)), [likedTracks])
@@ -220,7 +241,6 @@ export function TrackPage() {
     return `${mins}:${String(secs).padStart(2, '0')}`
   }
 
-  // Sync stats.likes when liked status changes from AudioPlayer
   useEffect(() => {
     if (!trackId) return
 
@@ -234,17 +254,14 @@ export function TrackPage() {
     }
   }, [likedTrackIds, trackId, previousLiked])
 
-  // Sync stats.plays with AudioContext playsCount
   useEffect(() => {
     if (!trackId || currentTrack?.id !== trackId) return
 
-    // Reset previousPlaysCount when track changes or replay starts
     if (isPlaying && !wasPlayingRef.current) {
       setPreviousPlaysCount(playsCount)
     }
     wasPlayingRef.current = isPlaying
 
-    // Increment stats.plays whenever AudioContext playsCount increases
     if (playsCount > previousPlaysCount) {
       setStats((prev) => ({
         ...prev,
@@ -306,6 +323,63 @@ export function TrackPage() {
       alert('Failed to like track')
     }
   }, [trackId, liked, track, toggleLike, resolveImage])
+
+  const handleAddToPlaylist = async () => {
+    const token = localStorage.getItem('authToken')
+    if (!token) {
+      alert('You need to log in to add tracks to playlists')
+      return
+    }
+
+    setShowPlaylistModal(true)
+    setLoadingPlaylists(true)
+
+    try {
+      const fetchedPlaylists = await getMyPlaylists(token)
+      setPlaylists(fetchedPlaylists)
+
+      const trackPlaylists = new Set<string>()
+      await Promise.all(
+        fetchedPlaylists.map(async (playlist: any) => {
+          try {
+            const response = await fetch(`${getApiOrigin()}/api/playlists/${playlist.id}/tracks`, {
+              headers: { Authorization: `Bearer ${token}` },
+            })
+            if (response.ok) {
+              const data = await response.json()
+              if (data.some((t: any) => t.localTrackId === trackId)) {
+                trackPlaylists.add(playlist.id)
+              }
+            }
+          } catch (err) {
+            console.error('Failed to check playlist tracks:', err)
+          }
+        })
+      )
+      setPlaylistsWithTrack(trackPlaylists)
+    } catch (error) {
+      console.error('Failed to load playlists:', error)
+      alert('Failed to load playlists')
+    } finally {
+      setLoadingPlaylists(false)
+    }
+  }
+
+  const handleAddTrackToPlaylist = async (playlistId: string) => {
+    const token = localStorage.getItem('authToken')
+    if (!token) {
+      alert('You need to log in to add tracks to playlists')
+      return
+    }
+
+    try {
+      await addTrackToPlaylist(playlistId, trackId!, token)
+      setPlaylistsWithTrack(prev => new Set(prev).add(playlistId))
+    } catch (error) {
+      console.error('Failed to add track to playlist:', error)
+      alert('Failed to add track to playlist')
+    }
+  }
 
   if (loading) {
     return (
@@ -511,7 +585,7 @@ export function TrackPage() {
             <button
               type="button"
               className="track-page-action-btn"
-              onClick={() => alert('Add to playlist feature coming soon')}
+              onClick={handleAddToPlaylist}
               aria-label="Add to playlist"
             >
               <svg viewBox="0 0 24 24" className="track-page-action-icon" aria-hidden="true">
@@ -637,6 +711,78 @@ export function TrackPage() {
         </div>
       </div>
       <Footer isAuthenticated={isAuthenticated} />
+
+      {showPlaylistModal && createPortal(
+        <div className="playlist-modal-overlay" onClick={() => setShowPlaylistModal(false)}>
+          <div className="playlist-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="playlist-modal-header">
+              <h3>Add to playlist</h3>
+              <button
+                type="button"
+                className="playlist-modal-close"
+                onClick={() => setShowPlaylistModal(false)}
+              >
+                ×
+              </button>
+            </div>
+            <div className="playlist-modal-content">
+              {loadingPlaylists ? (
+                <p>Loading playlists...</p>
+              ) : playlists.length === 0 ? (
+                <p>No playlists found. Create one first.</p>
+              ) : (
+                <div className="playlist-modal-list">
+                  {playlists.map((playlist) => {
+                    const imageUrl = resolveImage(playlist.playlistImagePath)
+                    return (
+                      <div key={playlist.id} className="playlist-modal-item">
+                        <div className="playlist-modal-item-left">
+                          {imageUrl ? (
+                            <img
+                              className="playlist-modal-item-cover"
+                              src={imageUrl}
+                              alt={playlist.name}
+                            />
+                          ) : (
+                            <div className="playlist-modal-item-cover">
+                              {playlist.name.slice(0, 1).toUpperCase()}
+                            </div>
+                          )}
+                          <span className="playlist-modal-item-name">{playlist.name}</span>
+                        </div>
+                        <button
+                          type="button"
+                          className="playlist-modal-add-btn"
+                          onClick={() => handleAddTrackToPlaylist(playlist.id)}
+                          disabled={playlistsWithTrack.has(playlist.id)}
+                          style={{
+                            opacity: playlistsWithTrack.has(playlist.id) ? 0.5 : 1,
+                            cursor: playlistsWithTrack.has(playlist.id) ? 'not-allowed' : 'pointer'
+                          }}
+                        >
+                          {playlistsWithTrack.has(playlist.id) ? 'Added' : 'Add'}
+                        </button>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+              <button
+                type="button"
+                className="solid-btn"
+                onClick={() => {
+                  setShowPlaylistModal(false)
+                  navigate('/playlist/create', { state: { trackId, title: track.title, subtitle: track.username, imageUrl: track.trackImagePath ? resolveImage(track.trackImagePath) : undefined, userId: track.userId } })
+                }}
+                style={{ marginTop: '16px', width: '100%' }}
+              >
+                Create new playlist
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
     </div>
   )
 }

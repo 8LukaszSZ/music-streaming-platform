@@ -106,11 +106,9 @@ namespace MusicStreaming.API.Hubs
                 IsRead = full.IsRead
             };
 
-            // Broadcast in real-time to everyone who joined this conversation
             await Clients.Group(ConversationGroup(dto.ConversationId))
                 .SendAsync("MessageReceived", dtoResult);
 
-            // Also notify the other participant even if they haven't joined the conversation group yet
             var conversation = await _conversationService.GetConversationByIdAsync(dto.ConversationId);
             if (conversation != null)
             {
@@ -130,10 +128,16 @@ namespace MusicStreaming.API.Hubs
             if (!participates)
                 throw new HubException("Forbidden");
 
+            var conversation = await _conversationService.GetConversationByIdAsync(conversationId);
+            if (conversation == null)
+                throw new HubException("Conversation not found");
+
+            var otherUserId = conversation.ParticipantAId == userId ? conversation.ParticipantBId : conversation.ParticipantAId;
+
             await _messageService.MarkMessagesAsReadAsync(conversationId, userId);
             var lastReadAt = DateTime.UtcNow;
 
-            await Clients.Group(ConversationGroup(conversationId))
+            await Clients.Group(UserGroup(otherUserId))
                 .SendAsync("MessagesRead", new { conversationId, readerId = userId, lastReadAt });
         }
     }

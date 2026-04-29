@@ -19,11 +19,9 @@ export function getAuthToken() {
 }
 
 export function getUserId(): string | null {
-  // First try to get userId from localStorage
   const userId = localStorage.getItem('userId')
   if (userId) return userId
 
-  // Fallback: decode JWT token to get userId
   const token = localStorage.getItem(AUTH_TOKEN_KEY)
   if (!token) return null
 

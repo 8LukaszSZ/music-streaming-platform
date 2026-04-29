@@ -1,9 +1,11 @@
 using IBL;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.SignalR;
 using Models.DTOs.Conversation;
 using Models.Entities;
 using MusicStreaming.API.Extensions;
+using MusicStreaming.API.Hubs;
 
 namespace MusicStreaming.API.Controllers
 {
@@ -13,10 +15,14 @@ namespace MusicStreaming.API.Controllers
     public class ConversationController : ControllerBase
     {
         private readonly IConversationService _conversationService;
+        private readonly IHubContext<ChatHub> _hubContext;
+        private readonly IMessageService _messageService;
 
-        public ConversationController(IConversationService conversationService)
+        public ConversationController(IConversationService conversationService, IHubContext<ChatHub> hubContext, IMessageService messageService)
         {
             _conversationService = conversationService;
+            _hubContext = hubContext;
+            _messageService = messageService;
         }
 
         // GET: api/conversation
@@ -27,15 +33,21 @@ namespace MusicStreaming.API.Controllers
 
             var conversations = await _conversationService.GetUserConversationsAsync(userId);
 
-            var result = conversations.Select(c => new ConversationDto
+            var result = new List<ConversationDto>();
+            foreach (var c in conversations)
             {
-                Id = c.Id,
-                ParticipantAId = c.ParticipantAId,
-                ParticipantBId = c.ParticipantBId,
-                ParticipantAUsername = c.ParticipantA.DisplayUsername(),
-                ParticipantBUsername = c.ParticipantB.DisplayUsername(),
-                CreatedAt = c.CreatedAt
-            });
+                var unreadCount = await _messageService.GetUnreadMessageCountAsync(c.Id, userId);
+                result.Add(new ConversationDto
+                {
+                    Id = c.Id,
+                    ParticipantAId = c.ParticipantAId,
+                    ParticipantBId = c.ParticipantBId,
+                    ParticipantAUsername = c.ParticipantA.DisplayUsername(),
+                    ParticipantBUsername = c.ParticipantB.DisplayUsername(),
+                    CreatedAt = c.CreatedAt,
+                    UnreadCount = unreadCount
+                });
+            }
 
             return Ok(result);
         }
@@ -57,6 +69,8 @@ namespace MusicStreaming.API.Controllers
             if (conversation == null)
                 return NotFound();
 
+            var unreadCount = await _messageService.GetUnreadMessageCountAsync(id, userId);
+
             var dto = new ConversationDto
             {
                 Id = conversation.Id,
@@ -64,7 +78,8 @@ namespace MusicStreaming.API.Controllers
                 ParticipantBId = conversation.ParticipantBId,
                 ParticipantAUsername = conversation.ParticipantA.DisplayUsername(),
                 ParticipantBUsername = conversation.ParticipantB.DisplayUsername(),
-                CreatedAt = conversation.CreatedAt
+                CreatedAt = conversation.CreatedAt,
+                UnreadCount = unreadCount
             };
 
             return Ok(dto);
@@ -81,6 +96,8 @@ namespace MusicStreaming.API.Controllers
             var fullConversation = await _conversationService
                 .GetConversationByIdAsync(conversation.Id);
 
+            var unreadCount = await _messageService.GetUnreadMessageCountAsync(fullConversation.Id, userId);
+
             var dto = new ConversationDto
             {
                 Id = fullConversation.Id,
@@ -88,7 +105,8 @@ namespace MusicStreaming.API.Controllers
                 ParticipantBId = fullConversation.ParticipantBId,
                 ParticipantAUsername = fullConversation.ParticipantA.DisplayUsername(),
                 ParticipantBUsername = fullConversation.ParticipantB.DisplayUsername(),
-                CreatedAt = fullConversation.CreatedAt
+                CreatedAt = fullConversation.CreatedAt,
+                UnreadCount = unreadCount
             };
 
             return Ok(dto);
@@ -106,10 +124,19 @@ namespace MusicStreaming.API.Controllers
             if (!participates)
                 return Forbid();
 
+            var conversation = await _conversationService.GetConversationByIdAsync(id);
+            if (conversation == null)
+                return NotFound();
+
+            var otherUserId = conversation.ParticipantAId == userId ? conversation.ParticipantBId : conversation.ParticipantAId;
+
             var deleted = await _conversationService.DeleteConversationAsync(id);
 
             if (deleted == null)
                 return NotFound();
+
+            await _hubContext.Clients.Group($"user:{otherUserId}")
+                .SendAsync("ConversationDeleted", id);
 
             return NoContent();
         }

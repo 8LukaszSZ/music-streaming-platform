@@ -16,5 +16,6 @@ namespace Models.DTOs.Conversation
         public string ParticipantBUsername { get; set; } = string.Empty;
 
         public DateTime CreatedAt { get; set; }
+        public int UnreadCount { get; set; }
     }
 }

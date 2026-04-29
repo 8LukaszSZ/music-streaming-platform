@@ -29,5 +29,6 @@ namespace IBL
         Task<ContentComment?> DeleteCommentAsync(Guid commentId);
 
         Task<bool> UserOwnsCommentAsync(Guid userId, Guid commentId);
+        Task<List<ContentComment>> GetLatestCommentsForUserTracksAsync(Guid creatorUserId, int count = 3);
     }
 }

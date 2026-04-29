@@ -358,7 +358,6 @@ namespace MusicStreaming.API.Controllers
                     }
                 }
 
-                // Downsample to 100 bars
                 var samplesPerBar = sampleData.Count / bars;
                 for (int i = 0; i < bars; i++)
                 {
@@ -373,13 +372,12 @@ namespace MusicStreaming.API.Controllers
                             sum += sampleData[j];
                         }
                         var average = sum / (end - start);
-                        waveform[i] = (int)(average * 100); // Scale to 0-100
+                        waveform[i] = (int)(average * 100);
                     }
                 }
             }
             catch
             {
-                // Fallback to random values if audio analysis fails
                 for (int i = 0; i < bars; i++)
                 {
                     waveform[i] = (int)(new Random().NextDouble() * 60 + 20);
@@ -387,6 +385,23 @@ namespace MusicStreaming.API.Controllers
             }
 
             return waveform;
+        }
+
+        // GET: api/localtracks/recommendations?artistUserId=...&count=10
+        [HttpGet("recommendations")]
+        [AllowAnonymous]
+        public async Task<ActionResult<IEnumerable<object>>> GetFansAlsoLike([FromQuery] Guid artistUserId, [FromQuery] int count = 10)
+        {
+            var recommendations = await _localTrackService.GetFansAlsoLikeRecommendationsAsync(artistUserId, count);
+            var result = recommendations.Select(t => new {
+                id = t.Id,
+                title = t.Title,
+                username = t.User?.Username,
+                userId = t.UserId,
+                trackImagePath = t.TrackImagePath,
+                duration = t.Duration
+            });
+            return Ok(result);
         }
     }
 }

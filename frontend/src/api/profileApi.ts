@@ -18,6 +18,10 @@ export function getMyPlaylists(token: string) {
   return request<PlaylistDto[]>('/playlists/me', { token })
 }
 
+export function getLikedPlaylists(token: string) {
+  return request<PlaylistDto[]>('/contentlikes/me/playlists', { token })
+}
+
 export function getPlaylistsByUserId(userId: string, token?: string) {
   return request<PlaylistDto[]>(`/playlists/user/${userId}`, { token })
 }
@@ -95,6 +99,14 @@ export function getMyLikedTracks(token: string) {
 
 export function getLikedTracksByUserId(userId: string, token?: string) {
   return request<TrackDto[]>(`/contentlikes/user/${userId}/tracks`, { token })
+}
+
+export function searchPlaylists(query: string, token?: string) {
+  return request<PlaylistDto[]>(`/playlists/search?query=${encodeURIComponent(query)}`, { token })
+}
+
+export function searchUsers(query: string, token?: string) {
+  return request<any[]>(`/user/search?query=${encodeURIComponent(query)}`, { token })
 }
 
 export async function updateMyProfile(token: string, payload: { bio: string; profileImage?: File }) {

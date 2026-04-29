@@ -13,11 +13,13 @@ namespace BL.Services
     {
         private readonly IContentCommentRepository _commentRepository;
         private readonly IUserRepository _userRepository;
+        private readonly ILocalTrackRepository _trackRepository;
 
-        public ContentCommentService(IContentCommentRepository commentRepository, IUserRepository userRepository)
+        public ContentCommentService(IContentCommentRepository commentRepository, IUserRepository userRepository, ILocalTrackRepository trackRepository)
         {
             _commentRepository = commentRepository;
             _userRepository = userRepository;
+            _trackRepository = trackRepository;
         }
 
         public Task<int> GetCommentCountAsync(Guid contentId, string contentType)
@@ -127,6 +129,26 @@ namespace BL.Services
         {
             var comment = await _commentRepository.GetByIdAsync(commentId);
             return comment != null && comment.UserId == userId;
+        }
+
+        public async Task<List<ContentComment>> GetLatestCommentsForUserTracksAsync(Guid creatorUserId, int count = 3)
+        {
+            // Get track IDs for the creator
+            var creatorTrackIds = await _trackRepository.GetLocalTracks()
+                .Where(t => t.UserId == creatorUserId)
+                .Select(t => t.Id)
+                .ToListAsync();
+
+            if (!creatorTrackIds.Any())
+                return new List<ContentComment>();
+
+            // Get comments on those tracks (excluding comments by the creator)
+            return await _commentRepository.GetContentComments()
+                .Where(cc => cc.ContentType == "TRACK" && cc.UserId != creatorUserId && creatorTrackIds.Contains(cc.ContentId))
+                .OrderByDescending(cc => cc.CreatedAt)
+                .Take(count)
+                .Include(cc => cc.User)
+                .ToListAsync();
         }
     }
 }

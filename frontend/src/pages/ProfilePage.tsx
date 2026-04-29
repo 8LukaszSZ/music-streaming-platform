@@ -4,8 +4,9 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { ProfileMediaTile } from '../components/ProfileMediaTile'
 import { getApiOrigin } from '../api/httpClient'
 import { getProfileData, getUserProfileData, updateProfileData } from '../services/profileService'
-import { likeTrack, unlikeTrack, deleteTrack } from '../api/audioApi'
+import { likeTrack, unlikeTrack, deleteTrack, getLatestCommentsForUser, getFansAlsoLike } from '../api/audioApi'
 import { followUser, unfollowUser, deletePlaylist } from '../api/profileApi'
+import { getUnreadMessageCount } from '../api/conversationApi'
 import type { PlaylistDto, TrackDto, UserActivityDto, UserLiteDto } from '../types/profile'
 import type { ProfileTab } from '../types/page'
 import { Footer } from '../components/Footer'
@@ -26,8 +27,11 @@ export function ProfilePage() {
   const [selectedImage, setSelectedImage] = useState<File | undefined>(undefined)
   const [saving, setSaving] = useState(false)
   const [isFollowing, setIsFollowing] = useState(false)
+  const [latestComments, setLatestComments] = useState<any[]>([])
+  const [fansAlsoLike, setFansAlsoLike] = useState<any[]>([])
+  const [playlistFilter, setPlaylistFilter] = useState<'all' | 'my' | 'added'>('all')
+  const [unreadMessageCount, setUnreadMessageCount] = useState(0)
 
-  // Decode JWT to get current user ID before any fetch
   const currentUserId = useMemo(() => {
     const token = localStorage.getItem('authToken')
     if (!token) return null
@@ -53,16 +57,23 @@ export function ProfilePage() {
     following: UserLiteDto[]
     likedTracks: TrackDto[]
   } | null>(null)
-  const fansAlsoLike = [
-    { title: 'Night Drive', artist: 'Lune', duration: 182 },
-    { title: 'Violet Lines', artist: 'Aeria', duration: 201 },
-    { title: 'Static Dreams', artist: 'Kade', duration: 168 },
-  ]
-  const latestComments = [
-    { author: 'Nova', text: 'This track is on repeat.', when: '2d ago' },
-    { author: 'Mira', text: 'Love the mix and vibe.', when: '5d ago' },
-    { author: 'Orin', text: 'The chorus hits hard.', when: '1w ago' },
-  ]
+
+  useEffect(() => {
+    const fetchUnreadCount = async () => {
+      const token = localStorage.getItem('authToken')
+      if (!token) return
+      try {
+        const count = await getUnreadMessageCount(token)
+        setUnreadMessageCount(count)
+      } catch (error) {
+        console.error('Failed to fetch unread message count:', error)
+      }
+    }
+
+    fetchUnreadCount()
+    const interval = setInterval(fetchUnreadCount, 30000)
+    return () => clearInterval(interval)
+  }, [])
 
   useEffect(() => {
     const load = async () => {
@@ -72,7 +83,6 @@ export function ProfilePage() {
         const data = userId ? await getUserProfileData(userId) : await getProfileData()
         setProfile(data)
 
-        // Only set contextLikedTracks when viewing own profile
         const isOwnProfile = !userId || userId === currentUserId
         if (isOwnProfile) {
           setLikedTracks(
@@ -87,7 +97,6 @@ export function ProfilePage() {
           )
         }
 
-        // Set track list for audio navigation
         const trackList = data.tracks.map((track) => ({
           id: track.id,
           title: track.title,
@@ -98,10 +107,28 @@ export function ProfilePage() {
         }))
         setTrackList(trackList)
 
-        // Check if current user is following this profile user
         if (userId && currentUserId) {
           const isUserFollowing = data.followers.some((f: UserLiteDto) => f.id === currentUserId)
           setIsFollowing(isUserFollowing)
+        }
+
+        const targetUserId = userId || currentUserId
+        if (targetUserId) {
+          try {
+            const comments = await getLatestCommentsForUser(targetUserId, 3)
+            setLatestComments(comments)
+          } catch (commentError) {
+            console.error('Failed to load latest comments:', commentError)
+            setLatestComments([])
+          }
+
+          try {
+            const recommendations = await getFansAlsoLike(targetUserId, 5)
+            setFansAlsoLike(recommendations)
+          } catch (recError) {
+            console.error('Failed to load recommendations:', recError)
+            setFansAlsoLike([])
+          }
         }
       } catch (loadError) {
         const message = loadError instanceof Error ? loadError.message : 'Failed to load profile.'
@@ -202,11 +229,9 @@ export function ProfilePage() {
         setIsFollowing(true)
       }
 
-      // Refetch profile data to get updated followers list
       const data = userId ? await getUserProfileData(userId) : await getProfileData()
       setProfile(data)
 
-      // Update isFollowing status
       if (userId && currentUserId) {
         const isUserFollowing = data.followers.some((f: UserLiteDto) => f.id === currentUserId)
         setIsFollowing(isUserFollowing)
@@ -231,7 +256,6 @@ export function ProfilePage() {
       if (response.ok) {
         const playlistTracks: any[] = await response.json()
         if (playlistTracks.length > 0) {
-          // Fetch all track details
           const trackDetailsList = await Promise.all(
             playlistTracks.map((pt) =>
               fetch(`${getApiOrigin()}/api/LocalTracks/${pt.localTrackId}`, {
@@ -250,7 +274,6 @@ export function ProfilePage() {
           }))
           setTrackList(trackList)
 
-          // Play first track
           const firstTrack = trackDetailsList[0]
           playTrack(
             {
@@ -286,7 +309,6 @@ export function ProfilePage() {
 
     try {
       await deletePlaylist(playlistId, token)
-      // Refetch profile data to update playlists list
       const data = userId ? await getUserProfileData(userId) : await getProfileData()
       setProfile(data)
     } catch (error) {
@@ -304,13 +326,13 @@ export function ProfilePage() {
       return
     }
 
-    // Try to find track in profile.tracks first, then in contextLikedTracks
     const trackDto = profile.tracks.find((t) => t.id === trackId)
+    const likedTrack = profile.likedTracks?.find((t) => t.id === trackId)
     const trackInfo = contextLikedTracks.find((t) => t.id === trackId)
-    const track = trackDto || trackInfo
+    const fansTrack = fansAlsoLike.find((t) => t.id === trackId)
+    const track = trackDto || likedTrack || trackInfo || fansTrack
     if (!track) return
 
-    // Only update local profile state if viewing own profile
     const isOwnProfile = !userId || userId === currentUserId
 
     try {
@@ -319,22 +341,20 @@ export function ProfilePage() {
         toggleLike(trackId, true, {
           id: track.id,
           title: track.title,
-          subtitle: trackInfo?.subtitle || trackDto?.username || 'Deleted User',
-          imageUrl: trackInfo?.imageUrl || (trackDto?.trackImagePath ? resolveImage(trackDto.trackImagePath) : undefined),
+          subtitle: trackInfo?.subtitle || trackDto?.username || likedTrack?.username || fansTrack?.username || 'Deleted User',
+          imageUrl: trackInfo?.imageUrl || (trackDto?.trackImagePath ? resolveImage(trackDto.trackImagePath) : (likedTrack?.trackImagePath ? resolveImage(likedTrack.trackImagePath) : (fansTrack?.trackImagePath ? `${getApiOrigin()}/${fansTrack.trackImagePath.replace(/^\//, '')}` : undefined))),
           duration: track.duration,
-          userId: trackDto?.userId || trackInfo?.userId,
+          userId: trackDto?.userId || likedTrack?.userId || trackInfo?.userId || fansTrack?.userId,
         })
-        // Update local profile state if viewing own profile
         if (isOwnProfile) {
           setProfile({
             ...profile,
-            likedTracks: [trackDto!, ...profile.likedTracks],
+            likedTracks: [trackDto || likedTrack || trackInfo || fansTrack, ...profile.likedTracks],
           })
         }
       } else {
         await unlikeTrack(trackId, token)
         toggleLike(trackId, false)
-        // Update local profile state if viewing own profile
         if (isOwnProfile) {
           setProfile({
             ...profile,
@@ -359,7 +379,6 @@ export function ProfilePage() {
 
     try {
       await deleteTrack(trackId, token)
-      // Remove track from local profile state
       setProfile({
         ...profile,
         tracks: profile.tracks.filter((t) => t.id !== trackId),
@@ -469,15 +488,28 @@ export function ProfilePage() {
                     <button
                       type="button"
                       className="ghost-btn"
-                      onClick={() => navigate('/messages')}
+                      onClick={() => navigate(`/chat/${userId}`)}
                     >
                       Message
                     </button>
                   </div>
                 ) : (
-                  <button type="button" className="ghost-btn profile-edit-btn" onClick={handleStartEdit}>
-                    Edit profile
-                  </button>
+                  <div className="profile-header-actions">
+                    <button type="button" className="ghost-btn" onClick={handleStartEdit}>
+                      Edit profile
+                    </button>
+                    <button
+                      type="button"
+                      className="ghost-btn"
+                      onClick={() => navigate('/chat')}
+                      style={{ marginLeft: '8px', position: 'relative' }}
+                    >
+                      Messages
+                      {unreadMessageCount > 0 && (
+                        <span className="notification-badge">{unreadMessageCount}</span>
+                      )}
+                    </button>
+                  </div>
                 )}
               </div>
 
@@ -514,6 +546,7 @@ export function ProfilePage() {
                         userId={track.userId}
                         isPrivate={track.isPrivate}
                         isCreator={track.userId === currentUserId}
+                        isTrackAuthor={track.userId === currentUserId}
                         onDelete={track.userId === currentUserId ? handleDelete : undefined}
                         onEdit={track.userId === currentUserId ? (trackId) => navigate(`/track/${trackId}/edit`) : undefined}
                         onPlay={handlePlayTrack}
@@ -532,21 +565,44 @@ export function ProfilePage() {
 
                 {activeTab === 'playlists' ? (
                   <>
-                    {profile.playlists.map((playlist) => (
-                      <ProfileMediaTile
-                        key={playlist.id}
-                        title={playlist.name}
-                        subtitle={playlist.description || (playlist.isPublic ? 'Public playlist' : 'Private playlist')}
-                        imageUrl={resolveImage(playlist.playlistImagePath)}
-                        playlistId={playlist.id}
-                        canPlay={true}
-                        onPlay={() => handlePlayPlaylist(playlist.id)}
-                        isCreator={playlist.userId === currentUserId}
-                        onEditPlaylist={handleEditPlaylist}
-                        onDeletePlaylist={handleDeletePlaylist}
-                        isPrivate={!playlist.isPublic}
-                      />
-                    ))}
+                    <div className="playlist-filter-wrapper">
+                      <select
+                        className="playlist-filter-select"
+                        value={playlistFilter}
+                        onChange={(e) => setPlaylistFilter(e.target.value as 'all' | 'my' | 'added')}
+                      >
+                        <option value="all">All</option>
+                        <option value="my">My playlists</option>
+                        <option value="added">Added playlists</option>
+                      </select>
+                    </div>
+                    {(() => {
+                      const profileOwnerId = userId || currentUserId
+                      const filteredPlaylists = profile.playlists.filter((playlist) => {
+                        if (!playlist.isPublic && playlist.userId !== currentUserId) return false
+                        if (playlistFilter === 'all') return true
+                        if (playlistFilter === 'my') return playlist.userId === profileOwnerId
+                        if (playlistFilter === 'added') return playlist.userId !== profileOwnerId
+                        return true
+                      })
+                      return filteredPlaylists.map((playlist) => (
+                        <ProfileMediaTile
+                          key={playlist.id}
+                          title={playlist.name}
+                          subtitle={playlist.username || 'Unknown Artist'}
+                          imageUrl={resolveImage(playlist.playlistImagePath)}
+                          playlistId={playlist.id}
+                          canPlay={true}
+                          onPlay={() => handlePlayPlaylist(playlist.id)}
+                          isCreator={playlist.userId === currentUserId}
+                          onEditPlaylist={handleEditPlaylist}
+                          onDeletePlaylist={handleDeletePlaylist}
+                          isPrivate={!playlist.isPublic}
+                          isPlaylistTile={true}
+                          userId={playlist.userId}
+                        />
+                      ))
+                    })()}
                     {profile.playlists.length === 0 ? <p className="track-meta">No playlists yet.</p> : null}
                     <div className="profile-cta">
                       <p className="profile-cta-title">Create more playlists. Share your taste.</p>
@@ -597,7 +653,11 @@ export function ProfilePage() {
 
               <div className="profile-side-header profile-side-section-title profile-liked-header">
                 <h3>Liked by me</h3>
-                <button type="button" className="profile-see-more">
+                <button
+                  type="button"
+                  className="profile-see-more"
+                  onClick={() => navigate(`/profile/${userId || currentUserId}/liked`)}
+                >
                   See more
                 </button>
               </div>
@@ -606,7 +666,7 @@ export function ProfilePage() {
                   contextLikedTracks.length === 0 ? (
                     <p className="track-meta">No liked tracks yet.</p>
                   ) : (
-                    contextLikedTracks.map((track) => (
+                    contextLikedTracks.slice(0, 3).map((track) => (
                       <ProfileMediaTile
                         key={track.id}
                         title={track.title}
@@ -618,6 +678,9 @@ export function ProfilePage() {
                         isLiked={isAuthenticated ? likedTrackIds.has(track.id) : false}
                         onLikeToggle={isAuthenticated ? handleLikeToggle : undefined}
                         userId={track.userId}
+                        isTrackAuthor={track.userId === currentUserId}
+                        onDelete={track.userId === currentUserId ? handleDelete : undefined}
+                        onEdit={track.userId === currentUserId ? (trackId) => navigate(`/track/${trackId}/edit`) : undefined}
                         onPlay={handlePlayLikedTrack}
                       />
                     ))
@@ -626,7 +689,7 @@ export function ProfilePage() {
                   profile.likedTracks.length === 0 ? (
                     <p className="track-meta">No liked tracks yet.</p>
                   ) : (
-                    profile.likedTracks.map((track) => (
+                    profile.likedTracks.slice(0, 3).map((track) => (
                       <ProfileMediaTile
                         key={track.id}
                         title={track.title}
@@ -639,6 +702,9 @@ export function ProfilePage() {
                         onLikeToggle={isAuthenticated ? handleLikeToggle : undefined}
                         userId={track.userId}
                         isPrivate={track.isPrivate}
+                        isTrackAuthor={track.userId === currentUserId}
+                        onDelete={track.userId === currentUserId ? handleDelete : undefined}
+                        onEdit={track.userId === currentUserId ? (trackId) => navigate(`/track/${trackId}/edit`) : undefined}
                         onPlay={handlePlayLikedTrack}
                       />
                     ))
@@ -648,39 +714,73 @@ export function ProfilePage() {
 
               <div className="profile-side-header profile-side-section-title">
                 <h3>Fans also like</h3>
-                <button type="button" className="profile-see-more">
-                  See more
-                </button>
+                {fansAlsoLike.length > 0 && (
+                  <button
+                    type="button"
+                    className="profile-see-more"
+                    onClick={() => navigate(`/profile/${userId || currentUserId}/fans-also-like`)}
+                  >
+                    See more
+                  </button>
+                )}
               </div>
               <div className="profile-list">
-                {fansAlsoLike.map((item) => (
+                {fansAlsoLike.slice(0, 3).map((item) => (
                   <ProfileMediaTile
-                    key={item.title}
+                    key={item.id}
                     title={item.title}
-                    subtitle={item.artist}
-                    trailingText={`${Math.floor(item.duration / 60)}:${String(item.duration % 60).padStart(2, '0')}`}
-                    trackId={undefined}
-                    canPlay={false}
+                    subtitle={item.username?.startsWith('Deleted_') ? 'Deleted user' : (item.username || 'Unknown Artist')}
+                    imageUrl={item.trackImagePath ? `${getApiOrigin()}/${item.trackImagePath.replace(/^\//, '')}` : undefined}
+                    trailingText={item.duration ? `${Math.floor(item.duration / 60)}:${String(item.duration % 60).padStart(2, '0')}` : undefined}
+                    trackId={item.id}
+                    canPlay={true}
+                    userId={item.userId}
+                    isLiked={isAuthenticated ? likedTrackIds.has(item.id) : false}
+                    onLikeToggle={isAuthenticated ? handleLikeToggle : undefined}
                   />
                 ))}
               </div>
 
               <div className="profile-side-header profile-side-section-title">
                 <h3>Latest comments</h3>
-                <button type="button" className="profile-see-more">
+                <button
+                  type="button"
+                  className="profile-see-more"
+                  onClick={() => navigate(`/profile/${userId || currentUserId}/comments`)}
+                >
                   See more
                 </button>
               </div>
               <div className="profile-comments">
-                {latestComments.map((c) => (
-                  <div key={`${c.author}-${c.text}`} className="profile-comment">
-                    <div className="profile-comment-top">
-                      <p className="track-title">{c.author}</p>
-                      <span className="track-meta">{c.when}</span>
+                {latestComments.length === 0 ? (
+                  <p className="track-meta">No comments on tracks yet.</p>
+                ) : (
+                  latestComments.map((c) => (
+                    <div key={c.id} className="profile-comment">
+                      <p
+                        className="track-title"
+                        style={{ cursor: 'pointer' }}
+                        onClick={() => navigate(`/track/${c.contentId}`)}
+                      >
+                        {c.trackTitle || 'Unknown Track'}
+                      </p>
+                      <div className="profile-comment-top">
+                        <p className="track-meta">
+                          <span
+                            style={{ cursor: 'pointer' }}
+                            onClick={() => navigate(`/profile/${c.user?.id}`)}
+                          >
+                            {c.user?.username || 'Unknown'}
+                          </span>
+                          : {c.content}
+                        </p>
+                        <span className="track-meta">
+                          {new Date(c.createdAt).toLocaleDateString()}
+                        </span>
+                      </div>
                     </div>
-                    <p className="track-meta">{c.text}</p>
-                  </div>
-                ))}
+                  ))
+                )}
               </div>
             </aside>
           </>

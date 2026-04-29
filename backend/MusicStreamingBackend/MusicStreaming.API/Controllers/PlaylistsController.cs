@@ -40,7 +40,8 @@ namespace MusicStreaming.API.Controllers
                 Description = p.Description,
                 IsPublic = p.IsPublic,
                 CreatedAt = p.CreatedAt,
-                PlaylistImagePath = p.PlaylistImagePath
+                PlaylistImagePath = p.PlaylistImagePath,
+                Username = p.User?.DisplayUsername()
             });
 
             return Ok(result);
@@ -68,7 +69,8 @@ namespace MusicStreaming.API.Controllers
                     Description = p.Description,
                     IsPublic = p.IsPublic,
                     CreatedAt = p.CreatedAt,
-                    PlaylistImagePath = p.PlaylistImagePath
+                    PlaylistImagePath = p.PlaylistImagePath,
+                    Username = p.User?.DisplayUsername()
                 });
 
             return Ok(result);

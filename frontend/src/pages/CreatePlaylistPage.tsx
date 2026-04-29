@@ -1,12 +1,14 @@
 import { useState, useMemo, useRef } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { Navbar } from '../components/Navbar'
 import { Footer } from '../components/Footer'
 import { ImageCropper } from '../components/ImageCropper'
 import { createPlaylist } from '../api/profileApi'
+import { addTrackToPlaylist } from '../api/audioApi'
 
 export function CreatePlaylistPage() {
   const navigate = useNavigate()
+  const location = useLocation()
   const [imageFile, setImageFile] = useState<File | null>(null)
   const [imagePreview, setImagePreview] = useState<string | null>(null)
   const [showCropper, setShowCropper] = useState(false)
@@ -59,6 +61,17 @@ export function CreatePlaylistPage() {
         }
       )
       console.log('Playlist created:', result)
+
+      const trackInfo = location.state as { trackId?: string } | null
+      if (trackInfo?.trackId && token) {
+        try {
+          await addTrackToPlaylist(result.id, trackInfo.trackId, token)
+          console.log('Track added to playlist')
+        } catch (addError) {
+          console.error('Failed to add track to playlist:', addError)
+        }
+      }
+
       navigate(`/playlist/${result.id}`)
     } catch (error) {
       console.error('Failed to create playlist:', error)

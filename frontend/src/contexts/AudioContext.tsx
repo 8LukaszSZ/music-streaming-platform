@@ -44,7 +44,6 @@ export function AudioProvider({ children }: { children: ReactNode }) {
   }, [clearProgressInterval])
 
   const playTrack = useCallback(async (track: TrackInfo, streamUrl: string) => {
-    // Cleanup previous audio
     if (audioRef.current) {
       audioRef.current.pause()
       audioRef.current = null
@@ -54,7 +53,6 @@ export function AudioProvider({ children }: { children: ReactNode }) {
     clearPlayTimer()
     setProgress(0)
 
-    // Reset plays count only when track actually changes
     if (currentTrack && currentTrack.id !== track.id) {
       setPlaysCount(0)
     }
@@ -93,10 +91,8 @@ export function AudioProvider({ children }: { children: ReactNode }) {
       setAudioUnlocked(true)
       startProgressInterval()
 
-      // Start play timer to count play after 20 seconds (or immediately if track is shorter)
       const token = localStorage.getItem('authToken')
       if (token) {
-        // Get duration to check if track is shorter than 20 seconds
         const duration = audio.duration
         const delay = duration < 20 ? duration * 1000 : 20000
 
@@ -133,10 +129,8 @@ export function AudioProvider({ children }: { children: ReactNode }) {
         setIsPlaying(true)
         startProgressInterval()
 
-        // Start play timer to count play after 20 seconds (or immediately if track is shorter)
         const token = localStorage.getItem('authToken')
         if (token && currentTrack) {
-          // Get duration to check if track is shorter than 20 seconds
           const duration = audioRef.current?.duration || 0
           const delay = duration < 20 ? duration * 1000 : 20000
 
@@ -177,7 +171,6 @@ export function AudioProvider({ children }: { children: ReactNode }) {
     playTrack(next, getTrackStreamUrl(next.id))
   }, [currentTrack, trackList, playTrack])
 
-  // Update ref whenever nextTrack changes
   nextTrackRef.current = nextTrack
 
   const prevTrack = useCallback(() => {

@@ -2,12 +2,12 @@ import { memo, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { createPortal } from 'react-dom'
 import { useAudio } from '../contexts/AudioContext'
-import { getTrackStreamUrl, addTrackToPlaylist } from '../api/audioApi'
+import { getTrackStreamUrl, addTrackToPlaylist, likePlaylist, unlikePlaylist } from '../api/audioApi'
 import { getMyPlaylists } from '../api/profileApi'
-import { getApiOrigin } from '../api/httpClient'
+import { getApiOrigin, request } from '../api/httpClient'
 import type { ProfileMediaTileProps } from '../types/component'
 
-export const ProfileMediaTile = memo(function ProfileMediaTile({ title, subtitle, imageUrl, trailingText, trackId, playlistId, canPlay = true, isLiked = false, onLikeToggle, userId, isPrivate = false, isCreator = false, onDelete, onEdit, onPlay, onDeletePlaylist, onEditPlaylist, onRemoveFromPlaylist }: ProfileMediaTileProps) {
+export const ProfileMediaTile = memo(function ProfileMediaTile({ title, subtitle, imageUrl, trailingText, trackId, playlistId, canPlay = true, isLiked = false, onLikeToggle, userId, isPrivate = false, isCreator = false, isTrackAuthor = false, onDelete, onEdit, onPlay, onDeletePlaylist, onEditPlaylist, onRemoveFromPlaylist, trackNumber, isPlaylistTile = false }: ProfileMediaTileProps) {
   const navigate = useNavigate()
   const { currentTrack, playTrack, pauseTrack, isPlaying } = useAudio()
   const [showMenu, setShowMenu] = useState(false)
@@ -15,6 +15,7 @@ export const ProfileMediaTile = memo(function ProfileMediaTile({ title, subtitle
   const [playlists, setPlaylists] = useState<any[]>([])
   const [loadingPlaylists, setLoadingPlaylists] = useState(false)
   const [playlistsWithTrack, setPlaylistsWithTrack] = useState<Set<string>>(new Set())
+  const [isPlaylistLiked, setIsPlaylistLiked] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
 
   const isCurrentTrack = trackId && currentTrack?.id === trackId
@@ -58,14 +59,27 @@ export const ProfileMediaTile = memo(function ProfileMediaTile({ title, subtitle
       }
     }
 
-    if (showMenu) {
-      document.addEventListener('mousedown', handleClickOutside)
-    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
 
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside)
+  useEffect(() => {
+    if (isPlaylistTile && playlistId) {
+      const fetchPlaylistLikeStatus = async () => {
+        const token = localStorage.getItem('authToken')
+        if (!token) return
+
+        try {
+          const response = await request<boolean>(`/contentlikes/me?contentId=${playlistId}&contentType=PLAYLIST`, { token })
+          setIsPlaylistLiked(response || false)
+        } catch (err) {
+          console.error('Failed to fetch playlist like status:', err)
+        }
+      }
+
+      fetchPlaylistLikeStatus()
     }
-  }, [showMenu])
+  }, [isPlaylistTile, playlistId])
 
   const handleLike = () => {
     if (!trackId) return
@@ -115,7 +129,6 @@ export const ProfileMediaTile = memo(function ProfileMediaTile({ title, subtitle
       const userPlaylists = await getMyPlaylists(token)
       console.log('Playlists data:', userPlaylists)
 
-      // Check which playlists already contain the track
       const playlistsWithTrackSet = new Set<string>()
       await Promise.all(
         userPlaylists.map(async (playlist: any) => {
@@ -167,9 +180,39 @@ export const ProfileMediaTile = memo(function ProfileMediaTile({ title, subtitle
     }
   }
 
+  const handleAddPlaylistToLibrary = async () => {
+    if (!playlistId || !isPlaylistTile) return
+
+    const token = localStorage.getItem('authToken')
+    if (!token) {
+      alert('You need to log in to add playlists to your library')
+      return
+    }
+
+    setShowMenu(false)
+
+    try {
+      if (isPlaylistLiked) {
+        await unlikePlaylist(playlistId, token)
+        setIsPlaylistLiked(false)
+      } else {
+        await likePlaylist(playlistId, token)
+        setIsPlaylistLiked(true)
+      }
+    } catch (error) {
+      console.error('Failed to toggle playlist library status:', error)
+      alert('Failed to update playlist library status')
+    }
+  }
+
   return (
     <div className={`profile-media-tile${isCurrentTrack ? ' active' : ''}`} role="group" aria-label={title}>
-      <div className="profile-media-left">
+      <div className="profile-media-left" style={{ display: 'flex', alignItems: 'center' }}>
+        {trackNumber !== undefined && (
+          <span className="track-number" style={{ minWidth: '22px', marginLeft: '12px', color: 'var(--text-m)', fontSize: '16px' }}>
+            {trackNumber}
+          </span>
+        )}
         {imageUrl ? (
           <img className="profile-media-image" src={imageUrl} alt={title} />
         ) : (
@@ -230,13 +273,23 @@ export const ProfileMediaTile = memo(function ProfileMediaTile({ title, subtitle
           </button>
           {showMenu && (
             <div className="profile-media-menu">
-              <button type="button" className="profile-menu-item" onClick={handleLike}>
-                <svg viewBox="0 0 24 24" className="icon" aria-hidden="true">
-                  <path d={isLiked ? "M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" : "M16.5 3c-1.74 0-3.41.81-4.5 2.09C10.91 3.81 9.24 3 7.5 3 4.42 3 2 5.42 2 8.5c0 3.78 3.4 6.86 8.55 11.54L12 21.35l1.45-1.32C18.6 15.36 22 12.28 22 8.5 22 5.42 19.58 3 16.5 3zm-4.4 15.55l-.1.1-.1-.1C7.14 14.24 4 11.39 4 8.5 4 6.5 5.5 5 7.5 5c1.54 0 3.04.99 3.57 2.36h1.87C13.46 5.99 14.96 5 16.5 5c2 0 3.5 1.5 3.5 3.5 0 2.89-3.14 5.74-7.9 10.05z"} />
-                </svg>
-                <span className={isLiked ? 'liked' : ''}>{isLiked ? 'liked' : 'like'}</span>
-              </button>
               {!playlistId && (
+                <button type="button" className="profile-menu-item" onClick={handleLike}>
+                  <svg viewBox="0 0 24 24" className="icon" aria-hidden="true">
+                    <path d={isLiked ? "M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" : "M16.5 3c-1.74 0-3.41.81-4.5 2.09C10.91 3.81 9.24 3 7.5 3 4.42 3 2 5.42 2 8.5c0 3.78 3.4 6.86 8.55 11.54L12 21.35l1.45-1.32C18.6 15.36 22 12.28 22 8.5 22 5.42 19.58 3 16.5 3zm-4.4 15.55l-.1.1-.1-.1C7.14 14.24 4 11.39 4 8.5 4 6.5 5.5 5 7.5 5c1.54 0 3.04.99 3.57 2.36h1.87C13.46 5.99 14.96 5 16.5 5c2 0 3.5 1.5 3.5 3.5 0 2.89-3.14 5.74-7.9 10.05z"} />
+                  </svg>
+                  <span className={isLiked ? 'liked' : ''}>{isLiked ? 'liked' : 'like'}</span>
+                </button>
+              )}
+              {!isCreator && isPlaylistTile && (
+                <button type="button" className="profile-menu-item" onClick={handleAddPlaylistToLibrary}>
+                  <svg viewBox="0 0 24 24" className="icon" aria-hidden="true">
+                    <path d="M14 10H2v2h12v-2zm0-4H2v2h12V6zm4 8v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zM2 16h8v-2H2v2z" />
+                  </svg>
+                  <span className={isPlaylistLiked ? 'liked' : ''}>{isPlaylistLiked ? 'Added playlist' : 'Add playlist'}</span>
+                </button>
+              )}
+              {!isPlaylistTile && (
                 <button type="button" className="profile-menu-item" onClick={handleAddToPlaylist}>
                   <svg viewBox="0 0 24 24" className="icon" aria-hidden="true">
                     <path d="M14 10H2v2h12v-2zm0-4H2v2h12V6zm4 8v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zM2 16h8v-2H2v2z" />
@@ -250,6 +303,14 @@ export const ProfileMediaTile = memo(function ProfileMediaTile({ title, subtitle
                 </svg>
                 <span>Share</span>
               </button>
+              {playlistId && onRemoveFromPlaylist && (
+                <button type="button" className="profile-menu-item" onClick={() => { setShowMenu(false); onRemoveFromPlaylist(trackId!) }}>
+                  <svg viewBox="0 0 24 24" className="icon" aria-hidden="true">
+                    <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
+                  </svg>
+                  <span>Remove</span>
+                </button>
+              )}
               {isCreator && playlistId && onEditPlaylist && (
                 <button type="button" className="profile-menu-item" onClick={() => { setShowMenu(false); onEditPlaylist(playlistId) }}>
                   <svg viewBox="0 0 24 24" className="icon" aria-hidden="true">
@@ -266,7 +327,7 @@ export const ProfileMediaTile = memo(function ProfileMediaTile({ title, subtitle
                   <span>Delete playlist</span>
                 </button>
               )}
-              {isCreator && !playlistId && (
+              {isTrackAuthor && trackId && (
                 <button type="button" className="profile-menu-item" onClick={handleEdit}>
                   <svg viewBox="0 0 24 24" className="icon" aria-hidden="true">
                     <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z" />
@@ -274,20 +335,12 @@ export const ProfileMediaTile = memo(function ProfileMediaTile({ title, subtitle
                   <span>Edit</span>
                 </button>
               )}
-              {isCreator && !playlistId && (
+              {isTrackAuthor && trackId && (
                 <button type="button" className="profile-menu-item" onClick={handleDelete}>
                   <svg viewBox="0 0 24 24" className="icon" aria-hidden="true">
                     <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z" />
                   </svg>
                   <span>Delete</span>
-                </button>
-              )}
-              {playlistId && onRemoveFromPlaylist && (
-                <button type="button" className="profile-menu-item" onClick={() => { setShowMenu(false); onRemoveFromPlaylist(trackId!) }}>
-                  <svg viewBox="0 0 24 24" className="icon" aria-hidden="true">
-                    <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
-                  </svg>
-                  <span>Remove</span>
                 </button>
               )}
             </div>
@@ -312,20 +365,7 @@ export const ProfileMediaTile = memo(function ProfileMediaTile({ title, subtitle
               {loadingPlaylists ? (
                 <p>Loading playlists...</p>
               ) : playlists.length === 0 ? (
-                <>
-                  <p>No playlists found. Create one first.</p>
-                  <button
-                    type="button"
-                    className="solid-btn"
-                    onClick={() => {
-                      setShowPlaylistModal(false)
-                      navigate('/playlist/create')
-                    }}
-                    style={{ marginTop: '16px', width: '100%' }}
-                  >
-                    Create a playlist
-                  </button>
-                </>
+                <p>No playlists found. Create one first.</p>
               ) : (
                 <div className="playlist-modal-list">
                   {playlists.map((playlist) => {
@@ -368,6 +408,17 @@ export const ProfileMediaTile = memo(function ProfileMediaTile({ title, subtitle
                   })}
                 </div>
               )}
+              <button
+                type="button"
+                className="solid-btn"
+                onClick={() => {
+                  setShowPlaylistModal(false)
+                  navigate('/playlist/create', { state: { trackId, title, subtitle, imageUrl, userId } })
+                }}
+                style={{ marginTop: '16px', width: '100%' }}
+              >
+                Create new playlist
+              </button>
             </div>
           </div>
         </div>,

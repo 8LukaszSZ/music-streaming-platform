@@ -56,6 +56,7 @@ namespace Models.DTOs.Interactions
         public bool IsDeleted { get; set; }
         public UserLiteDto User { get; set; } = new UserLiteDto();
         public List<ContentCommentResponseDto> Replies { get; set; } = new();
+        public string? TrackTitle { get; set; }
     }
 
     public class ContentPlayCreateDto

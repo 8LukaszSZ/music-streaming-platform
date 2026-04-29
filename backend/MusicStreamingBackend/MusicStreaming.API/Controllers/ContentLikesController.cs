@@ -117,6 +117,28 @@ namespace MusicStreaming.API.Controllers
             return Ok(result);
         }
 
+        // GET: api/contentlikes/me/playlists
+        [HttpGet("me/playlists")]
+        [Authorize(Roles = $"{UserRoles.User},{UserRoles.Admin}")]
+        public async Task<ActionResult<IEnumerable<object>>> GetLikedPlaylistsByMe()
+        {
+            var userId = User.GetUserId();
+            var playlists = await _contentLikeService.GetLikedPlaylistsByUserAsync(userId);
+
+            var result = playlists.Select(p => new
+            {
+                id = p.Id,
+                name = p.Name,
+                description = p.Description,
+                isPublic = p.IsPublic,
+                playlistImagePath = p.PlaylistImagePath,
+                userId = p.UserId,
+                username = p.User?.DisplayUsername()
+            });
+
+            return Ok(result);
+        }
+
         // POST: api/contentlikes
         [HttpPost]
         [Authorize(Roles = $"{UserRoles.User},{UserRoles.Admin}")]

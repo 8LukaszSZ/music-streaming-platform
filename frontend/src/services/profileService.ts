@@ -8,9 +8,10 @@ export async function getProfileData() {
   }
 
   const me = await profileApi.getMe(token)
-  const [tracks, playlists, activities, followers, following, likedTracks] = await Promise.all([
+  const [tracks, playlists, likedPlaylists, activities, followers, following, likedTracks] = await Promise.all([
     profileApi.getMyTracks(token),
     profileApi.getMyPlaylists(token),
+    profileApi.getLikedPlaylists(token),
     profileApi.getMyActivities(token),
     profileApi.getFollowers(me.id, token),
     profileApi.getFollowing(me.id, token),
@@ -19,10 +20,17 @@ export async function getProfileData() {
 
   const shared = activities.filter((activity) => activity.activityType === 'SHARE')
 
+  const allPlaylists = [...playlists]
+  likedPlaylists.forEach((likedPlaylist) => {
+    if (!allPlaylists.some((p) => p.id === likedPlaylist.id)) {
+      allPlaylists.push(likedPlaylist)
+    }
+  })
+
   return {
     me,
     tracks,
-    playlists,
+    playlists: allPlaylists,
     shared,
     followers,
     following,

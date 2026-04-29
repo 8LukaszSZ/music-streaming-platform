@@ -26,7 +26,6 @@ namespace MusicStreaming.API.Controllers
         }
 
         // GET: api/user
-        // Pełna lista użytkowników tylko dla administratora
         [HttpGet]
         [Authorize(Roles = UserRoles.Admin)]
         public async Task<ActionResult<IEnumerable<UserResponseDto>>> GetAll()

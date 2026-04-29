@@ -22,7 +22,6 @@ export function UploadPage() {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const audioInputRef = useRef<HTMLInputElement>(null)
 
-  // Get username from token
   const username = useMemo(() => {
     const token = localStorage.getItem('authToken')
     if (!token) return ''
@@ -36,7 +35,6 @@ export function UploadPage() {
 
   const isAuthenticated = useMemo(() => Boolean(localStorage.getItem('authToken')), [])
 
-  // Auto-fill artist from username on mount
   useEffect(() => {
     if (username) {
       setArtist(username)

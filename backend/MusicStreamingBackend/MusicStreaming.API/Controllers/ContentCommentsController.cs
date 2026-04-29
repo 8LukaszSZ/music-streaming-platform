@@ -1,4 +1,5 @@
 using IBL;
+using IDAL;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Models.Constants;
@@ -14,10 +15,12 @@ namespace MusicStreaming.API.Controllers
     public class ContentCommentsController : ControllerBase
     {
         private readonly IContentCommentService _contentCommentService;
+        private readonly ILocalTrackRepository _localTrackRepository;
 
-        public ContentCommentsController(IContentCommentService contentCommentService)
+        public ContentCommentsController(IContentCommentService contentCommentService, ILocalTrackRepository localTrackRepository)
         {
             _contentCommentService = contentCommentService;
+            _localTrackRepository = localTrackRepository;
         }
 
         // GET: api/contentcomments/count?contentId=...&contentType=TRACK
@@ -39,6 +42,25 @@ namespace MusicStreaming.API.Controllers
             return Ok(result);
         }
 
+        // GET: api/contentcomments/latest?userId=...
+        [HttpGet("latest")]
+        [AllowAnonymous]
+        public async Task<ActionResult<IEnumerable<ContentCommentResponseDto>>> GetLatestForUser([FromQuery] Guid userId, [FromQuery] int count = 3)
+        {
+            var comments = await _contentCommentService.GetLatestCommentsForUserTracksAsync(userId, count);
+            var result = new List<ContentCommentResponseDto>();
+
+            foreach (var comment in comments)
+            {
+                var dto = MapComment(comment);
+                var track = await _localTrackRepository.GetByIdAsync(comment.ContentId);
+                dto.TrackTitle = track?.Title;
+                result.Add(dto);
+            }
+
+            return Ok(result);
+        }
+
         // POST: api/contentcomments
         [HttpPost]
         [Authorize(Roles = $"{UserRoles.User},{UserRoles.Admin}")]
@@ -56,7 +78,6 @@ namespace MusicStreaming.API.Controllers
                 dto.ParentCommentId
             );
 
-            // Ensure navigation properties for response
             var createdFull = await _contentCommentService.GetCommentByIdAsync(created.Id);
             if (createdFull == null)
                 return Ok(MapComment(created));

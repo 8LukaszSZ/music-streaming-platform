@@ -20,5 +20,7 @@ namespace IBL
         Task<LocalTrack?> DeleteLocalTrackAsync(Guid localTrackId);
 
         Task<bool> UserOwnsLocalTrackAsync(Guid userId, Guid localTrackId);
+
+        Task<List<LocalTrack>> GetFansAlsoLikeRecommendationsAsync(Guid artistUserId, int count = 10);
     }
 }

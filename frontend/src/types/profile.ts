@@ -16,6 +16,7 @@ export type PlaylistDto = {
   description?: string
   isPublic: boolean
   playlistImagePath?: string
+  username?: string
 }
 
 export type UserLiteDto = {

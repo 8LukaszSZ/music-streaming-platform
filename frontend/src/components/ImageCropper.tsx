@@ -25,20 +25,15 @@ export function ImageCropper({ imageFile, onCroppedImage, onCancel }: ImageCropp
       const img = imageRef.current
       setImageSize({ width: img.width, height: img.height })
       
-      // Calculate minimum zoom to ensure image covers crop area
       const maxSize = Math.max(img.width, img.height)
       if (img.width > img.height) {
-        // Landscape: height needs to cover 400px
         setMinZoom(maxSize / img.height)
       } else if (img.height > img.width) {
-        // Portrait: width needs to cover 400px
         setMinZoom(maxSize / img.width)
       } else {
-        // Square
         setMinZoom(1)
       }
       
-      // Set initial zoom to minimum
       setZoom(prev => Math.max(prev, maxSize / (img.width > img.height ? img.height : img.width)))
     }
   }, [imageSrc])
@@ -56,7 +51,6 @@ export function ImageCropper({ imageFile, onCroppedImage, onCancel }: ImageCropp
         ctx.fillStyle = '#0f0f0f'
         ctx.fillRect(0, 0, canvas.width, canvas.height)
 
-        // Calculate the size to fit the image in the canvas
         const maxSize = Math.max(img.width, img.height)
         const scale = (400 / maxSize) * zoom
         
@@ -68,7 +62,6 @@ export function ImageCropper({ imageFile, onCroppedImage, onCancel }: ImageCropp
 
         ctx.drawImage(img, x, y, scaledWidth, scaledHeight)
 
-        // Draw dashed border around the crop area (the entire canvas)
         ctx.strokeStyle = '#9e77ff'
         ctx.lineWidth = 2
         ctx.setLineDash([8, 4])
@@ -91,14 +84,12 @@ export function ImageCropper({ imageFile, onCroppedImage, onCancel }: ImageCropp
       const scaledWidth = img.width * scale
       const scaledHeight = img.height * scale
 
-      // Calculate maximum allowed crop movement
       const maxCropX = (scaledWidth - 400) / 2
       const maxCropY = (scaledHeight - 400) / 2
 
       let newX = e.clientX - startX
       let newY = e.clientY - startY
 
-      // Constrain crop to prevent image from moving outside area
       newX = Math.max(-maxCropX, Math.min(maxCropX, newX))
       newY = Math.max(-maxCropY, Math.min(maxCropY, newY))
 
@@ -121,7 +112,6 @@ export function ImageCropper({ imageFile, onCroppedImage, onCancel }: ImageCropp
       const img = imageRef.current
 
       if (ctx && img) {
-        // Redraw without border for final crop
         ctx.fillStyle = '#0f0f0f'
         ctx.fillRect(0, 0, canvas.width, canvas.height)
 
@@ -152,7 +142,6 @@ export function ImageCropper({ imageFile, onCroppedImage, onCancel }: ImageCropp
       return
     }
 
-    // Calculate constraints for new zoom level
     const maxSize = Math.max(img.width, img.height)
     const scale = (400 / maxSize) * newZoom
     const scaledWidth = img.width * scale
@@ -161,7 +150,6 @@ export function ImageCropper({ imageFile, onCroppedImage, onCancel }: ImageCropp
     const maxCropX = (scaledWidth - 400) / 2
     const maxCropY = (scaledHeight - 400) / 2
 
-    // Adjust crop to stay within new bounds
     setCrop(prev => ({
       x: Math.max(-maxCropX, Math.min(maxCropX, prev.x)),
       y: Math.max(-maxCropY, Math.min(maxCropY, prev.y)),

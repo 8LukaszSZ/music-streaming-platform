@@ -35,7 +35,11 @@ builder.Services.AddControllers()
     {
         options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
     });
-builder.Services.AddSignalR();
+builder.Services.AddSignalR()
+    .AddJsonProtocol(options =>
+    {
+        options.PayloadSerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase;
+    });
 
 builder.Services.AddDbContext<MusicStreamingContext>(options =>
     options.UseNpgsql(
@@ -103,7 +107,6 @@ builder.Services.AddAuthentication(options =>
         RoleClaimType = System.Security.Claims.ClaimTypes.Role
     };
 
-    // Enable JWT auth for SignalR (WebSockets/SSE) where the token is commonly sent as a query string.
     options.Events = new JwtBearerEvents
     {
         OnMessageReceived = context =>

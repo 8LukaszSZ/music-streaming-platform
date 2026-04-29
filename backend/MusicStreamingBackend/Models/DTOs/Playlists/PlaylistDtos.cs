@@ -13,6 +13,7 @@ namespace Models.DTOs.Playlists
         public bool IsPublic { get; set; }
         public DateTime CreatedAt { get; set; }
         public string? PlaylistImagePath { get; set; }
+        public string? Username { get; set; }
     }
 
     public class PlaylistCreateDto

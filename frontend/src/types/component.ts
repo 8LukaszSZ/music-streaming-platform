@@ -11,12 +11,15 @@ export type ProfileMediaTileProps = {
   userId?: string
   isPrivate?: boolean
   isCreator?: boolean
+  isTrackAuthor?: boolean
   onDelete?: (trackId: string) => void
   onEdit?: (trackId: string) => void
   onPlay?: (trackId: string) => void
   onDeletePlaylist?: (playlistId: string) => void
   onEditPlaylist?: (playlistId: string) => void
   onRemoveFromPlaylist?: (trackId: string) => void
+  trackNumber?: number
+  isPlaylistTile?: boolean
 }
 
 export type WaveformProps = {

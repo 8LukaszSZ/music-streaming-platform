@@ -112,5 +112,22 @@ namespace MusicStreaming.API.Controllers
 
             return NoContent();
         }
+
+        // GET: api/message/unread-count
+        [HttpGet("unread-count")]
+        public async Task<ActionResult<int>> GetUnreadCount()
+        {
+            var userId = User.GetUserId();
+
+            var conversations = await _conversationService.GetUserConversationsAsync(userId);
+            int totalUnread = 0;
+
+            foreach (var conversation in conversations)
+            {
+                totalUnread += await _messageService.GetUnreadMessageCountAsync(conversation.Id, userId);
+            }
+
+            return Ok(totalUnread);
+        }
     }
 }

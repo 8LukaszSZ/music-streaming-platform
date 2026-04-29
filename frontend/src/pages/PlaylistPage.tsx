@@ -5,7 +5,7 @@ import { Footer } from '../components/Footer'
 import { ProfileMediaTile } from '../components/ProfileMediaTile'
 import { getApiOrigin } from '../api/httpClient'
 import { request } from '../api/httpClient'
-import { likeTrack, unlikeTrack, removeTrackFromPlaylist } from '../api/audioApi'
+import { likeTrack, unlikeTrack, removeTrackFromPlaylist, likePlaylist, unlikePlaylist, deleteTrack } from '../api/audioApi'
 import type { Playlist, PlaylistTrack, PlaylistTrackInfo } from '../types/profile'
 import { useAudio } from '../contexts/AudioContext'
 
@@ -17,6 +17,7 @@ export function PlaylistPage() {
   const [tracks, setTracks] = useState<PlaylistTrackInfo[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [isLiked, setIsLiked] = useState(false)
 
   const currentUserId = useMemo(() => {
     const token = localStorage.getItem('authToken')
@@ -110,6 +111,49 @@ export function PlaylistPage() {
     }
   }
 
+  const handleDelete = async (trackId: string) => {
+    if (!confirm('Are you sure you want to delete this track?')) return
+
+    const token = localStorage.getItem('authToken')
+    if (!token) {
+      alert('You need to log in to delete tracks')
+      return
+    }
+
+    try {
+      await deleteTrack(trackId, token)
+      setTracks(tracks.filter((t) => t.id !== trackId))
+    } catch (error) {
+      console.error('Failed to delete track:', error)
+      alert('Failed to delete track')
+    }
+  }
+
+  const handleEdit = (trackId: string) => {
+    navigate(`/track/${trackId}/edit`)
+  }
+
+  const handleLikeTogglePlaylist = async () => {
+    const token = localStorage.getItem('authToken')
+    if (!token) {
+      alert('You need to log in to like playlists')
+      return
+    }
+
+    try {
+      if (isLiked) {
+        await unlikePlaylist(playlistId!, token)
+        setIsLiked(false)
+      } else {
+        await likePlaylist(playlistId!, token)
+        setIsLiked(true)
+      }
+    } catch (error) {
+      console.error('Failed to toggle playlist like:', error)
+      alert('Failed to update playlist like status')
+    }
+  }
+
   const totalDuration = useMemo(() => {
     const duration = tracks.reduce((sum, track) => sum + (track.duration || 0), 0)
     console.log('Total duration calculation:', { tracks, duration })
@@ -138,7 +182,15 @@ export function PlaylistPage() {
 
         setPlaylist(playlistData)
 
-        // Fetch user data separately
+        if (token) {
+          try {
+            const response = await request<boolean>(`/contentlikes/me?contentId=${playlistId}&contentType=PLAYLIST`, { token })
+            setIsLiked(response || false)
+          } catch (err) {
+            console.error('Failed to fetch playlist like status:', err)
+          }
+        }
+
         if (playlistData.userId) {
           try {
             const userData = await request<{ id: string; username: string; profileImagePath?: string }>(`/user/${playlistData.userId}`, { token })
@@ -148,7 +200,6 @@ export function PlaylistPage() {
           }
         }
 
-        // Fetch track details for each playlist track
         if (tracksData && tracksData.length > 0) {
           const trackDetails = await Promise.all(
             tracksData.map(async (pt) => {
@@ -230,6 +281,28 @@ export function PlaylistPage() {
                 {formatDuration(totalDuration)}
               </span>
             </div>
+            {playlist.userId === currentUserId && (
+              <button
+                type="button"
+                className="ghost-btn"
+                onClick={() => navigate(`/playlist/${playlistId}/edit`)}
+                style={{ marginTop: '6px', padding: '6px 20px', fontSize: '14px', width: '150px'}}
+                aria-label="Edit playlist"
+              >
+                Edit playlist
+              </button>
+            )}
+            {playlist.userId !== currentUserId && isAuthenticated && (
+              <button
+                type="button"
+                className={isLiked ? 'solid-btn' : 'ghost-btn'}
+                onClick={handleLikeTogglePlaylist}
+                style={{ marginTop: '6px', padding: '6px 20px', fontSize: '14px', width: '150px'}}
+                aria-label={isLiked ? 'Remove from library' : 'Add to library'}
+              >
+                {isLiked ? 'Added playlist' : 'Add playlist'}
+              </button>
+            )}
             {!playlist.isPublic && (
               <div className="playlist-page-private-badge">
                 <svg viewBox="0 0 24 24" className="lock-icon" style={{ width: 14, height: 14, marginRight: 4 }}>
@@ -247,7 +320,7 @@ export function PlaylistPage() {
             <p className="track-meta">No tracks in this playlist yet.</p>
           ) : (
             <div className="profile-list">
-              {tracks.map((track) => (
+              {tracks.map((track, index) => (
                 <ProfileMediaTile
                   key={track.id}
                   title={track.title}
@@ -258,11 +331,15 @@ export function PlaylistPage() {
                   canPlay={!track.isPrivate || track.userId === currentUserId}
                   userId={track.userId}
                   isPrivate={track.isPrivate}
+                  isTrackAuthor={track.userId === currentUserId}
+                  onDelete={track.userId === currentUserId ? handleDelete : undefined}
+                  onEdit={track.userId === currentUserId ? handleEdit : undefined}
                   onPlay={handlePlayTrack}
                   isLiked={isAuthenticated ? likedTrackIds.has(track.id) : false}
                   onLikeToggle={isAuthenticated ? handleLikeToggle : undefined}
                   playlistId={playlistId}
-                  onRemoveFromPlaylist={handleRemoveFromPlaylist}
+                  onRemoveFromPlaylist={playlist.userId === currentUserId ? handleRemoveFromPlaylist : undefined}
+                  trackNumber={index + 1}
                 />
               ))}
             </div>
