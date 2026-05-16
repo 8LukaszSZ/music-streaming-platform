@@ -80,6 +80,10 @@ export function getFansAlsoLike(artistUserId: string, count: number = 5, token?:
   return request<any[]>(`/LocalTracks/recommendations?artistUserId=${artistUserId}&count=${count}`, { token })
 }
 
+export function getTrendingTracks(count: number = 6, token?: string) {
+  return request<any[]>(`/LocalTracks/trending?count=${count}`, { token })
+}
+
 export function getLikedTracksByUser(userId: string, token?: string) {
   return request<any[]>(`/ContentLikes/user/${userId}/tracks`, { token })
 }
@@ -184,5 +188,41 @@ export async function unlikePlaylist(playlistId: string, token?: string) {
     method: 'DELETE',
     token,
     body: { contentId: playlistId, contentType: 'PLAYLIST' },
+  })
+}
+
+export async function shareContent(contentId: string, contentType: 'TRACK' | 'PLAYLIST', message?: string, token?: string) {
+  return request('/useractivities/share', {
+    method: 'POST',
+    token,
+    body: { contentId, contentType, message },
+  })
+}
+
+export async function getUserActivities(userId: string, all: boolean = false, token?: string) {
+  return request(`/useractivities/${userId}?all=${all}`, {
+    method: 'GET',
+    token,
+  })
+}
+
+export async function getMyActivities(all: boolean = false, token?: string) {
+  return request(`/useractivities/me?all=${all}`, {
+    method: 'GET',
+    token,
+  })
+}
+
+export async function deleteActivity(activityId: string, token?: string) {
+  return request(`/useractivities/${activityId}`, {
+    method: 'DELETE',
+    token,
+  })
+}
+
+export function getContentStatsTwoWeeks(contentId: string, contentType: 'TRACK' | 'PLAYLIST', token?: string) {
+  return request(`/contentstats/two-weeks?contentId=${contentId}&contentType=${contentType}`, {
+    method: 'GET',
+    token,
   })
 }

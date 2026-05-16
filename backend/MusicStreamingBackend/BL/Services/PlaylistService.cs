@@ -12,10 +12,14 @@ namespace BL.Services
     public class PlaylistService : IPlaylistService
     {
         private readonly IPlaylistRepository _playlistRepository;
+        private readonly IContentLikeRepository _likeRepository;
+        private readonly IContentPlayRepository _playRepository;
 
-        public PlaylistService(IPlaylistRepository playlistRepository)
+        public PlaylistService(IPlaylistRepository playlistRepository, IContentLikeRepository likeRepository, IContentPlayRepository playRepository)
         {
             _playlistRepository = playlistRepository;
+            _likeRepository = likeRepository;
+            _playRepository = playRepository;
         }
 
         public Task<int> GetPlaylistCountAsync()
@@ -118,6 +122,60 @@ namespace BL.Services
             playlist.IsPublic = isPublic;
             await _playlistRepository.UpdateAsync(playlist);
             return true;
+        }
+
+        public async Task<List<Playlist>> GetPopularPlaylistsAsync(int count = 10)
+        {
+            var playlists = await _playlistRepository.GetPlaylists()
+                .AsNoTracking()
+                .Include(p => p.User)
+                .Include(p => p.PlaylistTracks)
+                .Where(p => p.IsPublic)
+                .ToListAsync();
+
+            var playlistIds = playlists.Select(p => p.Id).ToList();
+            var allTrackIds = playlists
+                .SelectMany(p => p.PlaylistTracks.Select(pt => pt.LocalTrackId))
+                .Distinct()
+                .ToList();
+
+            var allLikes = await _likeRepository.GetContentLikes()
+                .Where(cl => playlistIds.Contains(cl.ContentId) && cl.ContentType == "PLAYLIST")
+                .Select(cl => new { cl.ContentId, cl.UserId })
+                .ToListAsync();
+
+            var allPlays = allTrackIds.Count == 0
+                ? []
+                : await _playRepository.GetContentPlays()
+                    .Where(cp => allTrackIds.Contains(cp.ContentId) && cp.ContentType == "TRACK" && cp.UserId != null)
+                    .Select(cp => new { cp.ContentId, UserId = cp.UserId!.Value })
+                    .ToListAsync();
+
+            var likesByPlaylist = allLikes
+                .GroupBy(l => l.ContentId)
+                .ToDictionary(g => g.Key, g => g.Select(x => x.UserId).ToHashSet());
+
+            return playlists
+                .Select(playlist =>
+                {
+                    var likerIds = likesByPlaylist.TryGetValue(playlist.Id, out var playlistLikerIds)
+                        ? playlistLikerIds
+                        : new HashSet<Guid>();
+                    var likesCount = likerIds.Count;
+                    var trackIds = playlist.PlaylistTracks.Select(pt => pt.LocalTrackId).ToHashSet();
+
+                    var playsByLikers = allPlays.Count(cp =>
+                        trackIds.Contains(cp.ContentId) &&
+                        likerIds.Contains(cp.UserId));
+
+                    var score = likesCount * 2.0 + Math.Log(playsByLikers + 1);
+
+                    return new { Playlist = playlist, Score = score };
+                })
+                .OrderByDescending(x => x.Score)
+                .Take(count)
+                .Select(x => x.Playlist)
+                .ToList();
         }
     }
 }

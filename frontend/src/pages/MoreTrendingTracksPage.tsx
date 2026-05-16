@@ -1,19 +1,17 @@
 import { useEffect, useState, useCallback } from 'react'
-import { useParams } from 'react-router-dom'
 import { Navbar } from '../components/Navbar'
 import { Footer } from '../components/Footer'
 import { ProfileMediaTile } from '../components/ProfileMediaTile'
 import { ShareModal } from '../components/ShareModal'
 import { useAudio } from '../contexts/AudioContext'
-import { getFansAlsoLike, likeTrack, unlikeTrack, shareContent, getUserActivities, deleteActivity, getTrackStreamUrl } from '../api/audioApi'
+import { getTrendingTracks, getTrackStreamUrl, likeTrack, unlikeTrack, shareContent, getUserActivities, deleteActivity } from '../api/audioApi'
 import { getApiOrigin } from '../api/httpClient'
 import { useCurrentUser } from '../hooks/useCurrentUser'
 import { useAuth } from '../hooks/useAuth'
 import { getToken } from '../utils/auth'
 
-export function AllFansAlsoLikePage() {
-  const { userId } = useParams<{ userId?: string }>()
-  const { toggleLike, likedTracks: contextLikedTracks, playTrack, pauseTrack, currentTrack, isPlaying, setTrackList } = useAudio()
+export function MoreTrendingTracksPage() {
+  const { likedTracks: contextLikedTracks, playTrack, pauseTrack, currentTrack, isPlaying, toggleLike, setTrackList } = useAudio()
   const [loading, setLoading] = useState(true)
   const [tracks, setTracks] = useState<any[]>([])
   const [shareModal, setShareModal] = useState<{ content: { title: string; subtitle?: string; imageUrl?: string }, contentType: 'TRACK' | 'PLAYLIST', contentId: string } | null>(null)
@@ -26,12 +24,10 @@ export function AllFansAlsoLikePage() {
 
   useEffect(() => {
     const loadSharedActivities = async () => {
-      const targetUserId = userId || currentUserId
-      if (!targetUserId) return
-
+      if (!currentUserId) return
       try {
         const token = getToken()
-        const activities = await getUserActivities(targetUserId, false, token || undefined)
+        const activities = await getUserActivities(currentUserId, false, token || undefined)
         const activitiesArray = Array.isArray(activities) ? activities : []
         setSharedActivities(activitiesArray)
       } catch (error) {
@@ -41,23 +37,15 @@ export function AllFansAlsoLikePage() {
     }
 
     loadSharedActivities()
-  }, [userId, currentUserId])
+  }, [currentUserId])
 
   useEffect(() => {
     const load = async () => {
       setLoading(true)
       try {
-        const targetUserId = userId || currentUserId
-        if (!targetUserId) {
-          setTracks([])
-          setLoading(false)
-          return
-        }
-
-        const token = getToken()
-        const fetchedTracks = await getFansAlsoLike(targetUserId, 50, token || undefined)
-        const publicTracks = fetchedTracks.filter((t: any) => !t.isPrivate)
-        const formattedTracks = publicTracks.map((t: any) => ({
+        const token = getToken() || undefined
+        const fetchedTracks = await getTrendingTracks(25, token)
+        const formattedTracks = fetchedTracks.map((t: any) => ({
           id: t.id,
           title: t.title,
           subtitle: t.username?.startsWith('Deleted_') ? 'Deleted user' : (t.username || 'Unknown Artist'),
@@ -67,7 +55,7 @@ export function AllFansAlsoLikePage() {
         }))
         setTracks(formattedTracks)
       } catch (error) {
-        console.error('Failed to load recommendations:', error)
+        console.error('Failed to load trending tracks:', error)
         setTracks([])
       } finally {
         setLoading(false)
@@ -75,10 +63,10 @@ export function AllFansAlsoLikePage() {
     }
 
     load()
-  }, [userId, currentUserId])
+  }, [])
 
   const handleLikeToggle = async (trackId: string, isLiked: boolean) => {
-    const token = localStorage.getItem('authToken')
+    const token = getToken()
     if (!token) {
       alert('You need to log in to like tracks')
       return
@@ -108,6 +96,33 @@ export function AllFansAlsoLikePage() {
     }
   }
 
+  const handlePlay = (trackId: string) => {
+    const track = tracks.find(t => t.id === trackId)
+    if (!track) return
+
+    if (currentTrack?.id === trackId && isPlaying) {
+      pauseTrack()
+    } else {
+      const trackInfo = {
+        id: track.id,
+        title: track.title,
+        subtitle: track.subtitle || 'Deleted User',
+        imageUrl: track.imageUrl,
+        duration: track.duration,
+        userId: track.userId,
+      }
+      setTrackList(tracks.map(t => ({
+        id: t.id,
+        title: t.title,
+        subtitle: t.subtitle || 'Deleted User',
+        imageUrl: t.imageUrl,
+        duration: t.duration,
+        userId: t.userId,
+      })))
+      playTrack(trackInfo, getTrackStreamUrl(track.id))
+    }
+  }
+
   const handleShare = useCallback((contentId: string, contentType: 'TRACK' | 'PLAYLIST', title: string, subtitle?: string, imageUrl?: string) => {
     setShareModal({
       content: { title, subtitle, imageUrl },
@@ -119,7 +134,7 @@ export function AllFansAlsoLikePage() {
   const handleShareSubmit = useCallback(async (message?: string) => {
     if (!shareModal) return
 
-    const token = localStorage.getItem('authToken')
+    const token = getToken()
     if (!token) {
       alert('You need to log in to share content')
       return
@@ -149,7 +164,7 @@ export function AllFansAlsoLikePage() {
   }, [shareModal])
 
   const handleUnshare = useCallback(async (activityId: string) => {
-    const token = localStorage.getItem('authToken')
+    const token = getToken()
     if (!token) return
 
     try {
@@ -160,33 +175,6 @@ export function AllFansAlsoLikePage() {
       alert('Failed to remove from shared')
     }
   }, [])
-
-  const handlePlay = (trackId: string) => {
-    const track = tracks.find(t => t.id === trackId)
-    if (!track) return
-
-    if (currentTrack?.id === trackId && isPlaying) {
-      pauseTrack()
-    } else {
-      const trackInfo = {
-        id: track.id,
-        title: track.title,
-        subtitle: track.subtitle,
-        imageUrl: track.imageUrl,
-        duration: track.duration,
-        userId: track.userId,
-      }
-      setTrackList(tracks.map(t => ({
-        id: t.id,
-        title: t.title,
-        subtitle: t.subtitle,
-        imageUrl: t.imageUrl,
-        duration: t.duration,
-        userId: t.userId,
-      })))
-      playTrack(trackInfo, getTrackStreamUrl(track.id))
-    }
-  }
 
   if (loading) {
     return (
@@ -204,29 +192,29 @@ export function AllFansAlsoLikePage() {
     <div className="page">
       <Navbar />
       <div className="upload-page-container">
-        <h1 className="upload-page-title">Fans also like</h1>
+        <h1 className="upload-page-title">Trending Tracks</h1>
         {tracks.length === 0 ? (
-          <p className="track-meta">No recommendations yet.</p>
+          <p className="track-meta">No trending tracks yet.</p>
         ) : (
           <div className="profile-list">
-            {tracks.map((item, index) => (
+            {tracks.map((track, index) => (
               <ProfileMediaTile
-                key={item.id}
-                title={item.title}
-                subtitle={item.subtitle}
-                imageUrl={item.imageUrl}
-                trailingText={item.duration ? `${Math.floor(item.duration / 60)}:${String(item.duration % 60).padStart(2, '0')}` : undefined}
-                trackId={item.id}
+                key={track.id}
+                title={track.title}
+                subtitle={track.subtitle || 'Deleted User'}
+                imageUrl={track.imageUrl}
+                trailingText={track.duration ? `${Math.floor(track.duration / 60)}:${String(track.duration % 60).padStart(2, '0')}` : undefined}
+                trackId={track.id}
                 canPlay={true}
-                userId={item.userId}
-                isLiked={isAuthenticated ? contextLikedTrackIds.has(item.id) : false}
+                userId={track.userId}
+                isLiked={isAuthenticated ? contextLikedTrackIds.has(track.id) : false}
                 onLikeToggle={isAuthenticated ? handleLikeToggle : undefined}
                 onPlay={handlePlay}
                 trackNumber={index + 1}
-                isShared={sharedContentIds.has(`TRACK-${item.id}`)}
-                onShare={isAuthenticated && !sharedContentIds.has(`TRACK-${item.id}`) ? (contentId, contentType) => handleShare(contentId, contentType, item.title, item.subtitle, item.imageUrl) : undefined}
-                onUnshare={isAuthenticated && sharedContentIds.has(`TRACK-${item.id}`) ? () => {
-                  const activity = sharedActivities.find(a => a.contentType === 'TRACK' && a.contentId === item.id)
+                isShared={sharedContentIds.has(`TRACK-${track.id}`)}
+                onShare={isAuthenticated && !sharedContentIds.has(`TRACK-${track.id}`) ? (contentId, contentType) => handleShare(contentId, contentType, track.title, track.subtitle || 'Deleted User', track.imageUrl) : undefined}
+                onUnshare={isAuthenticated && sharedContentIds.has(`TRACK-${track.id}`) ? () => {
+                  const activity = sharedActivities.find(a => a.contentType === 'TRACK' && a.contentId === track.id)
                   if (activity) handleUnshare(activity.id)
                 } : undefined}
               />

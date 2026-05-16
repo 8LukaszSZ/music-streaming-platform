@@ -399,6 +399,24 @@ namespace MusicStreaming.API.Controllers
                 username = t.User?.Username,
                 userId = t.UserId,
                 trackImagePath = t.TrackImagePath,
+                duration = t.Duration,
+                isPrivate = t.IsPrivate
+            });
+            return Ok(result);
+        }
+
+        // GET: api/localtracks/trending?count=10
+        [HttpGet("trending")]
+        [AllowAnonymous]
+        public async Task<ActionResult<IEnumerable<object>>> GetTrending([FromQuery] int count = 6)
+        {
+            var trending = await _localTrackService.GetTrendingTracksAsync(count);
+            var result = trending.Select(t => new {
+                id = t.Id,
+                title = t.Title,
+                username = t.User?.Username,
+                userId = t.UserId,
+                trackImagePath = t.TrackImagePath,
                 duration = t.Duration
             });
             return Ok(result);

@@ -21,6 +21,6 @@ namespace IBL
             string? message
         );
 
-        Task<UserActivity?> DeleteActivityAsync(Guid activityId);
+        Task<UserActivity?> DeleteActivityAsync(Guid activityId, Guid userId);
     }
 }

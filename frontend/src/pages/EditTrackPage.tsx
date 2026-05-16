@@ -1,10 +1,13 @@
-import { useState, useMemo, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Navbar } from '../components/Navbar'
 import { Footer } from '../components/Footer'
 import { ImageCropper } from '../components/ImageCropper'
 import { getTrackById } from '../api/audioApi'
 import { getApiOrigin } from '../api/httpClient'
+import { useAuth } from '../hooks/useAuth'
+import { getToken } from '../utils/auth'
+import { resolveImage } from '../utils/image'
 
 export function EditTrackPage() {
   const navigate = useNavigate()
@@ -22,22 +25,14 @@ export function EditTrackPage() {
   const [error, setError] = useState('')
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  const isAuthenticated = useMemo(() => Boolean(localStorage.getItem('authToken')), [])
-
-  const resolveImage = (path: string | undefined) => {
-    if (!path) return undefined
-    if (path.startsWith('http://') || path.startsWith('https://')) {
-      return path
-    }
-    return `${getApiOrigin()}/${path.replace(/^\//, '')}`
-  }
+  const isAuthenticated = useAuth()
 
   useEffect(() => {
     const loadTrack = async () => {
       if (!trackId) return
 
       try {
-        const token = localStorage.getItem('authToken') || undefined
+        const token = getToken() || undefined
         const data = await getTrackById(trackId, token) as any
         setTitle(data.title)
         setIsPublic(!data.isPrivate)

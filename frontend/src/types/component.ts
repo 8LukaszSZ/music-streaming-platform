@@ -20,6 +20,9 @@ export type ProfileMediaTileProps = {
   onRemoveFromPlaylist?: (trackId: string) => void
   trackNumber?: number
   isPlaylistTile?: boolean
+  onShare?: (contentId: string, contentType: 'TRACK' | 'PLAYLIST') => void
+  onUnshare?: () => void
+  isShared?: boolean
 }
 
 export type WaveformProps = {
@@ -36,4 +39,17 @@ export type ImageCropperProps = {
 
 export type FooterProps = {
   isAuthenticated: boolean
+}
+
+export type ShareContent = {
+  title: string
+  subtitle?: string
+  imageUrl?: string
+}
+
+export type ShareModalProps = {
+  content: ShareContent
+  contentType: 'TRACK' | 'PLAYLIST'
+  onShare: (message?: string) => Promise<void>
+  onCancel: () => void
 }

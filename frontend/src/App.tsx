@@ -24,6 +24,10 @@ import { EditPlaylistPage } from './pages/EditPlaylistPage'
 import { AllCommentsPage } from './pages/AllCommentsPage'
 import { AllLikedTracksPage } from './pages/AllLikedTracksPage'
 import { AllFansAlsoLikePage } from './pages/AllFansAlsoLikePage'
+import { AllSharedPage } from './pages/AllSharedPage'
+import { MoreTrendingTracksPage } from './pages/MoreTrendingTracksPage'
+import { MorePopularPlaylistsPage } from './pages/MorePopularPlaylistsPage'
+import { StatsPage } from './pages/StatsPage'
 import { ChatPage } from './pages/ChatPage'
 import { AudioProvider } from './contexts/AudioContext'
 import { AudioPlayer } from './components/AudioPlayer'
@@ -47,6 +51,10 @@ function App() {
           <Route path="/profile/:userId/comments" element={<AllCommentsPage />} />
           <Route path="/profile/:userId/liked" element={<AllLikedTracksPage />} />
           <Route path="/profile/:userId/fans-also-like" element={<AllFansAlsoLikePage />} />
+          <Route path="/profile/:userId/shared" element={<AllSharedPage />} />
+          <Route path="/profile/:userId/stats" element={<StatsPage />} />
+          <Route path="/trending" element={<MoreTrendingTracksPage />} />
+          <Route path="/playlists/popular" element={<MorePopularPlaylistsPage />} />
           <Route path="/chat" element={<ChatPage />} />
           <Route path="/chat/:userId" element={<ChatPage />} />
           <Route path="/upload" element={<UploadPage />} />

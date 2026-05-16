@@ -1,10 +1,12 @@
-import { useState, useMemo, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Navbar } from '../components/Navbar'
 import { Footer } from '../components/Footer'
 import { ImageCropper } from '../components/ImageCropper'
 import { getPlaylistById, updatePlaylist, updatePlaylistVisibility } from '../api/profileApi'
-import { getApiOrigin } from '../api/httpClient'
+import { useAuth } from '../hooks/useAuth'
+import { getToken } from '../utils/auth'
+import { resolveImage } from '../utils/image'
 
 export function EditPlaylistPage() {
   const navigate = useNavigate()
@@ -20,22 +22,14 @@ export function EditPlaylistPage() {
   const [saving, setSaving] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  const isAuthenticated = useMemo(() => Boolean(localStorage.getItem('authToken')), [])
-
-  const resolveImage = (path: string | undefined) => {
-    if (!path) return undefined
-    if (path.startsWith('http://') || path.startsWith('https://')) {
-      return path
-    }
-    return `${getApiOrigin()}/${path.replace(/^\//, '')}`
-  }
+  const isAuthenticated = useAuth()
 
   useEffect(() => {
     const loadPlaylist = async () => {
       if (!playlistId) return
 
       try {
-        const token = localStorage.getItem('authToken') || undefined
+        const token = getToken() || undefined
         const playlist = await getPlaylistById(playlistId, token)
         setName(playlist.name)
         setDescription(playlist.description || '')
@@ -86,7 +80,7 @@ export function EditPlaylistPage() {
 
     setSaving(true)
     try {
-      const token = localStorage.getItem('authToken') || undefined
+      const token = getToken() || undefined
 
       await updatePlaylist(
         playlistId!,

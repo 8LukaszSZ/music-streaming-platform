@@ -27,4 +27,5 @@ export type AudioContextType = {
   setLikedTracks: (tracks: TrackInfo[]) => void
   toggleLike: (trackId: string, isLiked: boolean, track?: TrackInfo) => void
   incrementPlaysCount: () => void
+  stopAndClearAudio: () => void
 }

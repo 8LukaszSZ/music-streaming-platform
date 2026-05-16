@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { Navbar } from '../components/Navbar'
 import { Footer } from '../components/Footer'
 import { getLatestCommentsForUser } from '../api/audioApi'
+import { getToken } from '../utils/auth'
 
 export function AllCommentsPage() {
   const { userId } = useParams<{ userId: string }>()
@@ -18,7 +19,7 @@ export function AllCommentsPage() {
       setError('')
 
       try {
-        const token = localStorage.getItem('authToken') || undefined
+        const token = getToken() || undefined
         const commentsData = await getLatestCommentsForUser(userId, 100, token)
         setComments(commentsData)
       } catch (loadError) {

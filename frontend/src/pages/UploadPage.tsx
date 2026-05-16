@@ -1,9 +1,11 @@
-import { useState, useMemo, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Navbar } from '../components/Navbar'
 import { Footer } from '../components/Footer'
 import { ImageCropper } from '../components/ImageCropper'
 import { uploadTrack } from '../api/audioApi'
+import { useCurrentUser } from '../hooks/useCurrentUser'
+import { useAuth } from '../hooks/useAuth'
 
 export function UploadPage() {
   const navigate = useNavigate()
@@ -22,18 +24,10 @@ export function UploadPage() {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const audioInputRef = useRef<HTMLInputElement>(null)
 
-  const username = useMemo(() => {
-    const token = localStorage.getItem('authToken')
-    if (!token) return ''
-    try {
-      const payload = JSON.parse(atob(token.split('.')[1]))
-      return payload.unique_name || payload.username || ''
-    } catch {
-      return ''
-    }
-  }, [])
+  const currentUserId = useCurrentUser()
+  const isAuthenticated = useAuth()
 
-  const isAuthenticated = useMemo(() => Boolean(localStorage.getItem('authToken')), [])
+  const username = currentUserId || ''
 
   useEffect(() => {
     if (username) {

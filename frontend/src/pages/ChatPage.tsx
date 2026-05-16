@@ -7,6 +7,8 @@ import { getMyConversations, createConversation, deleteConversation, getMessages
 import type { SendMessageDto } from '../api/conversationApi'
 import type { ConversationDto, MessageDto } from '../api/conversationApi'
 import { getApiOrigin } from '../api/httpClient'
+import { useCurrentUser } from '../hooks/useCurrentUser'
+import { getToken } from '../utils/auth'
 
 export function ChatPage() {
   const { userId } = useParams<{ userId?: string }>()
@@ -30,12 +32,7 @@ export function ChatPage() {
   const shouldAutoScrollRef = useRef(true)
   const processedMessagesRef = useRef<Set<string>>(new Set())
 
-  const currentUserId = useRef<string | null>((() => {
-    const token = localStorage.getItem('authToken')
-    if (!token) return null
-    const payload = JSON.parse(atob(token.split('.')[1]))
-    return payload.nameid || payload.sub
-  })())
+  const currentUserId = useCurrentUser()
 
   useEffect(() => {
     const init = async () => {
@@ -84,7 +81,7 @@ export function ChatPage() {
   }
 
   const setupSignalRConnection = async () => {
-    const token = localStorage.getItem('authToken')
+    const token = getToken()
     if (!token) return
 
     const connection = new signalR.HubConnectionBuilder()
@@ -107,7 +104,7 @@ export function ChatPage() {
           }
           return [...prev, message]
         })
-        if (message.senderId !== currentUserId.current && connectionRef.current?.state === signalR.HubConnectionState.Connected) {
+        if (message.senderId !== currentUserId && connectionRef.current?.state === signalR.HubConnectionState.Connected) {
           connectionRef.current.invoke('MarkConversationAsRead', message.conversationId)
           setConversations((prev) =>
             prev.map((c) => (c.id === message.conversationId ? { ...c, unreadCount: 0 } : c))
@@ -117,7 +114,7 @@ export function ChatPage() {
     })
 
     connection.on('NewMessageNotification', (message: MessageDto) => {
-      if (message.senderId === currentUserId.current) {
+      if (message.senderId === currentUserId) {
         return
       }
       if (processedMessagesRef.current.has(message.id)) {
@@ -207,7 +204,7 @@ export function ChatPage() {
   }
 
   const loadConversations = async (): Promise<ConversationDto[]> => {
-    const token = localStorage.getItem('authToken')
+    const token = getToken()
     if (!token) return []
 
     try {
@@ -227,14 +224,14 @@ export function ChatPage() {
   }
 
   const findOrCreateConversation = async (targetUserId: string, loadedConversations: ConversationDto[]) => {
-    const token = localStorage.getItem('authToken')
+    const token = getToken()
     if (!token) return
 
     try {
       const existingConversation = loadedConversations.find(
         (conv) =>
-          (conv.participantAId === targetUserId && conv.participantBId === currentUserId.current) ||
-          (conv.participantBId === targetUserId && conv.participantAId === currentUserId.current)
+          (conv.participantAId === targetUserId && conv.participantBId === currentUserId) ||
+          (conv.participantBId === targetUserId && conv.participantAId === currentUserId)
       )
       if (existingConversation) {
         setSelectedConversation(existingConversation)
@@ -251,7 +248,7 @@ export function ChatPage() {
   }
 
   const loadMessages = async (conversationId: string, previousConversationId?: string) => {
-    const token = localStorage.getItem('authToken')
+    const token = getToken()
     if (!token) return
 
     if (previousConversationId) {
@@ -303,13 +300,13 @@ export function ChatPage() {
   }
 
   const getOtherParticipant = (conversation: ConversationDto) => {
-    return conversation.participantAId === currentUserId.current
+    return conversation.participantAId === currentUserId
       ? conversation.participantBUsername
       : conversation.participantAUsername
   }
 
   const getOtherParticipantId = (conversation: ConversationDto) => {
-    return conversation.participantAId === currentUserId.current
+    return conversation.participantAId === currentUserId
       ? conversation.participantBId
       : conversation.participantAId
   }
@@ -344,7 +341,7 @@ export function ChatPage() {
   const handleConfirmDelete = useCallback(async () => {
     if (!conversationToDelete) return
 
-    const token = localStorage.getItem('authToken')
+    const token = getToken()
     if (!token) return
 
     try {
@@ -480,20 +477,20 @@ export function ChatPage() {
                   <p className="chat-empty">No messages yet. Start the conversation!</p>
                 ) : (
                   messages.map((message, index) => {
-                    const isLastSentByMe = message.senderId === currentUserId.current &&
-                      messages.slice(index + 1).every(m => m.senderId !== currentUserId.current)
+                    const isLastSentByMe = message.senderId === currentUserId &&
+                      messages.slice(index + 1).every(m => m.senderId !== currentUserId)
 
                     return (
                       <div
                         key={message.id}
-                        className={`chat-message ${message.senderId === currentUserId.current ? 'sent' : 'received'}`}
+                        className={`chat-message ${message.senderId === currentUserId ? 'sent' : 'received'}`}
                       >
                         <div className="chat-message-content">{message.content}</div>
                         <div className="chat-message-meta">
                           <span className="chat-message-time">
                             {new Date(message.sentAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                           </span>
-                          {message.senderId === currentUserId.current && isLastSentByMe && (
+                          {message.senderId === currentUserId && isLastSentByMe && (
                             <span className="chat-message-status">
                               {message.isRead ? '✓✓ Read' : '✓ Sent'}
                             </span>
@@ -543,7 +540,7 @@ export function ChatPage() {
           )}
         </div>
       </div>
-      <Footer isAuthenticated={Boolean(localStorage.getItem('authToken'))} />
+      <Footer isAuthenticated={Boolean(getToken())} />
 
       {/* Delete Confirmation Modal */}
       {deleteModalOpen && (

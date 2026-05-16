@@ -48,10 +48,9 @@ export function Navbar() {
             WaveStream
           </Link>
           <nav className="nav-links">
-            <NavLink to="/" end>
+            <NavLink to="/trending">
               Discover
             </NavLink>
-            <NavLink to="/stream">Stream</NavLink>
           </nav>
         </div>
 
@@ -74,9 +73,13 @@ export function Navbar() {
         </div>
 
         <div className="nav-right">
-          <Link to="/upload" className="ghost-btn">
+          <button
+            type="button"
+            className="ghost-btn"
+            onClick={() => navigate(isAuthenticated ? '/upload' : '/login')}
+          >
             Upload
-          </Link>
+          </button>
           {isAuthenticated ? (
             <>
               <Link className="ghost-btn" to="/profile">

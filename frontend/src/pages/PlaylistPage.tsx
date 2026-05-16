@@ -3,11 +3,14 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { Navbar } from '../components/Navbar'
 import { Footer } from '../components/Footer'
 import { ProfileMediaTile } from '../components/ProfileMediaTile'
-import { getApiOrigin } from '../api/httpClient'
 import { request } from '../api/httpClient'
 import { likeTrack, unlikeTrack, removeTrackFromPlaylist, likePlaylist, unlikePlaylist, deleteTrack } from '../api/audioApi'
 import type { Playlist, PlaylistTrack, PlaylistTrackInfo } from '../types/profile'
 import { useAudio } from '../contexts/AudioContext'
+import { useCurrentUser } from '../hooks/useCurrentUser'
+import { useAuth } from '../hooks/useAuth'
+import { getToken } from '../utils/auth'
+import { resolveImage } from '../utils/image'
 
 export function PlaylistPage() {
   const { playlistId } = useParams<{ playlistId: string }>()
@@ -19,26 +22,8 @@ export function PlaylistPage() {
   const [error, setError] = useState('')
   const [isLiked, setIsLiked] = useState(false)
 
-  const currentUserId = useMemo(() => {
-    const token = localStorage.getItem('authToken')
-    if (!token) return null
-    try {
-      const payload = JSON.parse(atob(token.split('.')[1]))
-      return payload.nameid || payload.sub || null
-    } catch {
-      return null
-    }
-  }, [])
-
-  const isAuthenticated = useMemo(() => Boolean(localStorage.getItem('authToken')), [])
-
-  const resolveImage = (path: string | undefined) => {
-    if (!path) return ''
-    if (path.startsWith('http://') || path.startsWith('https://')) return path
-
-    const normalizedPath = path.replaceAll('\\', '/').replace(/^wwwroot\//, '')
-    return `${getApiOrigin()}${normalizedPath.startsWith('/') ? normalizedPath : `/${normalizedPath}`}`
-  }
+  const currentUserId = useCurrentUser()
+  const isAuthenticated = useAuth()
 
   const handlePlayTrack = (_trackId: string) => {
     const trackList = tracks.map((track) => ({
@@ -57,7 +42,7 @@ export function PlaylistPage() {
   }, [likedTracks])
 
   const handleLikeToggle = async (trackId: string, isLiked: boolean) => {
-    const token = localStorage.getItem('authToken')
+    const token = getToken()
     if (!token) {
       alert('You need to log in to like tracks')
       return

@@ -8,6 +8,10 @@ import { useAudio } from '../contexts/AudioContext'
 import { getApiOrigin } from '../api/httpClient'
 import { likeTrack, unlikeTrack, getTrackById, getTrackStreamUrl, getWaveform, getComments, createComment, deleteComment, getCommentsCount, getLikesCount, getPlaysCount, addTrackToPlaylist } from '../api/audioApi'
 import { getMyPlaylists } from '../api/profileApi'
+import { useCurrentUser } from '../hooks/useCurrentUser'
+import { useAuth } from '../hooks/useAuth'
+import { resolveImage } from '../utils/image'
+import { formatDuration } from '../utils/time'
 
 export function TrackPage() {
   const { trackId } = useParams<{ trackId: string }>()
@@ -31,16 +35,8 @@ export function TrackPage() {
   const [playlistsWithTrack, setPlaylistsWithTrack] = useState<Set<string>>(new Set())
   const wasPlayingRef = useRef(false)
 
-  const currentUserId = useMemo(() => {
-    const token = localStorage.getItem('authToken')
-    if (!token) return null
-    try {
-      const payload = JSON.parse(atob(token.split('.')[1]))
-      return payload.nameid || payload.sub || null
-    } catch {
-      return null
-    }
-  }, [])
+  const currentUserId = useCurrentUser()
+  const isAuthenticated = useAuth()
 
   useEffect(() => {
     const loadAll = async () => {
@@ -223,23 +219,8 @@ export function TrackPage() {
     }
   }, [trackId, comments])
 
-  const isAuthenticated = useMemo(() => Boolean(localStorage.getItem('authToken')), [])
   const likedTrackIds = useMemo(() => new Set(likedTracks.map((t) => t.id)), [likedTracks])
   const liked = useMemo(() => likedTrackIds.has(trackId || ''), [likedTrackIds, trackId])
-
-  const resolveImage = useCallback((path: string | undefined) => {
-    if (!path) return ''
-    if (path.startsWith('http://') || path.startsWith('https://')) return path
-
-    const normalizedPath = path.replaceAll('\\', '/').replace(/^wwwroot\//, '')
-    return `${getApiOrigin()}${normalizedPath.startsWith('/') ? normalizedPath : `/${normalizedPath}`}`
-  }, [])
-
-  const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60)
-    const secs = Math.floor(seconds % 60)
-    return `${mins}:${String(secs).padStart(2, '0')}`
-  }
 
   useEffect(() => {
     if (!trackId) return
@@ -450,7 +431,7 @@ export function TrackPage() {
 
         <div className="track-page-right">
           <div className="track-page-waveform">
-            <div className="track-page-waveform-time-start">{formatTime(currentTrack?.id === track.id ? progress : 0)}</div>
+            <div className="track-page-waveform-time-start">{formatDuration(currentTrack?.id === track.id ? progress : 0)}</div>
             <div className="track-page-waveform-fallback">
               <Waveform
                 waveformBars={waveformBars}
@@ -476,7 +457,7 @@ export function TrackPage() {
                   }
                 }}
               />
-              <div className="track-page-waveform-time-end">{formatTime(currentTrack?.id === track.id ? duration : track.duration)}</div>
+              <div className="track-page-waveform-time-end">{formatDuration(currentTrack?.id === track.id ? duration : track.duration)}</div>
             </div>
 
             {/* Track stats */}

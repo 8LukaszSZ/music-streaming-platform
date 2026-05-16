@@ -1,10 +1,11 @@
-import { useState, useMemo, useRef } from 'react'
+import { useState, useRef } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { Navbar } from '../components/Navbar'
 import { Footer } from '../components/Footer'
 import { ImageCropper } from '../components/ImageCropper'
 import { createPlaylist } from '../api/profileApi'
 import { addTrackToPlaylist } from '../api/audioApi'
+import { useAuth } from '../hooks/useAuth'
 
 export function CreatePlaylistPage() {
   const navigate = useNavigate()
@@ -18,7 +19,7 @@ export function CreatePlaylistPage() {
   const [isPublic, setIsPublic] = useState(true)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  const isAuthenticated = useMemo(() => Boolean(localStorage.getItem('authToken')), [])
+  const isAuthenticated = useAuth()
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]

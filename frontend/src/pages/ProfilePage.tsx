@@ -1,21 +1,25 @@
 import { Navbar } from '../components/Navbar'
+import { ShareModal } from '../components/ShareModal'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { ProfileMediaTile } from '../components/ProfileMediaTile'
 import { getApiOrigin } from '../api/httpClient'
 import { getProfileData, getUserProfileData, updateProfileData } from '../services/profileService'
-import { likeTrack, unlikeTrack, deleteTrack, getLatestCommentsForUser, getFansAlsoLike } from '../api/audioApi'
-import { followUser, unfollowUser, deletePlaylist } from '../api/profileApi'
-import { getUnreadMessageCount } from '../api/conversationApi'
+import { likeTrack, unlikeTrack, deleteTrack, getLatestCommentsForUser, getFansAlsoLike, shareContent, getUserActivities, getTrackById, deleteActivity, getContentStatsTwoWeeks } from '../api/audioApi'
+import { followUser, unfollowUser, deletePlaylist, getPlaylistById } from '../api/profileApi'
 import type { PlaylistDto, TrackDto, UserActivityDto, UserLiteDto } from '../types/profile'
 import type { ProfileTab } from '../types/page'
 import { Footer } from '../components/Footer'
 import { useAudio } from '../contexts/AudioContext'
+import { useCurrentUser } from '../hooks/useCurrentUser'
+import { useAuth } from '../hooks/useAuth'
+import { useUnreadCount } from '../hooks/useUnreadCount'
+import { resolveImage } from '../utils/image'
+import { getToken } from '../utils/auth'
 
 export function ProfilePage() {
   const navigate = useNavigate()
   const { userId } = useParams<{ userId?: string }>()
-  const isAuthenticated = Boolean(localStorage.getItem('authToken'))
   const { setTrackList, setLikedTracks, toggleLike, likedTracks: contextLikedTracks, playTrack } = useAudio()
   const [activeTab, setActiveTab] = useState<ProfileTab>('tracks')
   const [loading, setLoading] = useState(true)
@@ -30,18 +34,14 @@ export function ProfilePage() {
   const [latestComments, setLatestComments] = useState<any[]>([])
   const [fansAlsoLike, setFansAlsoLike] = useState<any[]>([])
   const [playlistFilter, setPlaylistFilter] = useState<'all' | 'my' | 'added'>('all')
-  const [unreadMessageCount, setUnreadMessageCount] = useState(0)
-
-  const currentUserId = useMemo(() => {
-    const token = localStorage.getItem('authToken')
-    if (!token) return null
-    try {
-      const payload = JSON.parse(atob(token.split('.')[1]))
-      return payload.nameid || payload.sub || null
-    } catch {
-      return null
-    }
-  }, [])
+  const unreadMessageCount = useUnreadCount()
+  const [shareModal, setShareModal] = useState<{ content: { title: string; subtitle?: string; imageUrl?: string }, contentType: 'TRACK' | 'PLAYLIST', contentId: string } | null>(null)
+  const [sharedActivities, setSharedActivities] = useState<any[]>([])
+  const [mySharedActivities, setMySharedActivities] = useState<any[]>([])
+  const [loadingShared, setLoadingShared] = useState(false)
+  const [sharedContentDetails, setSharedContentDetails] = useState<Map<string, any>>(new Map())
+  const [stats, setStats] = useState({ likes: 0, tracks: 0, playlists: 0, plays: 0 })
+  const [loadingStats, setLoadingStats] = useState(false)
 
   const [profile, setProfile] = useState<{
     me: {
@@ -58,22 +58,189 @@ export function ProfilePage() {
     likedTracks: TrackDto[]
   } | null>(null)
 
+  const currentUserId = useCurrentUser()
+  const isAuthenticated = useAuth()
+
+  const handleShare = useCallback((contentId: string, contentType: 'TRACK' | 'PLAYLIST', title: string, subtitle?: string, imageUrl?: string) => {
+    setShareModal({
+      content: { title, subtitle, imageUrl },
+      contentType,
+      contentId
+    })
+  }, [])
+
+  const handleShareSubmit = useCallback(async (message?: string) => {
+    if (!shareModal) return
+
+    const token = getToken()
+    if (!token) {
+      alert('You need to log in to share content')
+      return
+    }
+
+    try {
+      const result = await shareContent(shareModal.contentId, shareModal.contentType, message, token) as any
+      setShareModal(null)
+
+      if (result && result.id) {
+        const newActivity = {
+          id: result.id,
+          userId: result.userId,
+          contentId: shareModal.contentId,
+          contentType: shareModal.contentType,
+          message: message || '',
+          createdAt: new Date().toISOString(),
+        }
+        setMySharedActivities((prev) => [newActivity, ...prev])
+
+        const targetUserId = userId || currentUserId
+        if (targetUserId === currentUserId) {
+          setSharedActivities((prev) => [newActivity, ...prev])
+
+          const key = `${shareModal.contentType}-${shareModal.contentId}`
+          try {
+            let content
+            if (shareModal.contentType === 'TRACK') {
+              content = await getTrackById(shareModal.contentId, token)
+            } else if (shareModal.contentType === 'PLAYLIST') {
+              content = await getPlaylistById(shareModal.contentId, token)
+            }
+            if (content) {
+              setSharedContentDetails((prev) => new Map(prev).set(key, content))
+            }
+          } catch (error) {
+            console.error('Failed to load content details:', error)
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Failed to share content:', error)
+      alert('Failed to share content')
+    }
+  }, [shareModal, userId, currentUserId])
+
+  const handleUnshare = useCallback(async (activityId: string) => {
+    const token = getToken()
+    if (!token) return
+
+    try {
+      await deleteActivity(activityId, token)
+      setMySharedActivities((prev) => prev.filter((a) => a.id !== activityId))
+      setSharedActivities((prev) => prev.filter((a) => a.id !== activityId))
+    } catch (error) {
+      console.error('Failed to remove shared item:', error)
+      alert('Failed to remove from shared')
+    }
+  }, [])
+
   useEffect(() => {
-    const fetchUnreadCount = async () => {
-      const token = localStorage.getItem('authToken')
-      if (!token) return
+    const loadSharedActivities = async () => {
+      const targetUserId = userId || currentUserId
+      if (!targetUserId) return
+
+      setLoadingShared(true)
       try {
-        const count = await getUnreadMessageCount(token)
-        setUnreadMessageCount(count)
+        const token = getToken()
+        const activities = await getUserActivities(targetUserId, false, token || undefined)
+        const activitiesArray = Array.isArray(activities) ? activities : []
+        setSharedActivities(activitiesArray)
+
+        if (activeTab === 'shared') {
+          const detailsMap = new Map<string, any>()
+          await Promise.all(
+            activitiesArray.map(async (activity: any) => {
+              const key = `${activity.contentType}-${activity.contentId}`
+              if (activity.contentType === 'TRACK') {
+                try {
+                  const track = await getTrackById(activity.contentId, token || undefined)
+                  detailsMap.set(key, track)
+                } catch (error) {
+                  console.error('Failed to load track:', error)
+                }
+              } else if (activity.contentType === 'PLAYLIST') {
+                try {
+                  const playlist = await getPlaylistById(activity.contentId, token || undefined)
+                  detailsMap.set(key, playlist)
+                } catch (error) {
+                  console.error('Failed to load playlist:', error)
+                }
+              }
+            })
+          )
+          setSharedContentDetails(detailsMap)
+        }
       } catch (error) {
-        console.error('Failed to fetch unread message count:', error)
+        console.error('Failed to load shared activities:', error)
+        setSharedActivities([])
+      } finally {
+        setLoadingShared(false)
       }
     }
 
-    fetchUnreadCount()
-    const interval = setInterval(fetchUnreadCount, 30000)
-    return () => clearInterval(interval)
-  }, [])
+    loadSharedActivities()
+  }, [userId, currentUserId, activeTab])
+
+  useEffect(() => {
+    const loadMySharedActivities = async () => {
+      if (!currentUserId) return
+
+      try {
+        const token = getToken()
+        const activities = await getUserActivities(currentUserId, false, token || undefined)
+        const activitiesArray = Array.isArray(activities) ? activities : []
+        setMySharedActivities(activitiesArray)
+      } catch (error) {
+        console.error('Failed to load my shared activities:', error)
+        setMySharedActivities([])
+      }
+    }
+
+    loadMySharedActivities()
+  }, [currentUserId])
+
+  useEffect(() => {
+    const loadStats = async () => {
+      const targetUserId = userId || currentUserId
+      if (!targetUserId || !profile) return
+
+      setLoadingStats(true)
+      try {
+        const token = getToken()
+        const likesCount = profile.likedTracks?.length || 0
+        const tracksCount = profile.tracks?.length || 0
+        // Count only playlists created by the user (not liked playlists)
+        const playlistsCount = profile.playlists?.filter(p => p.userId === targetUserId).length || 0
+
+        // Calculate total plays from all tracks using contentstats endpoint
+        let totalPlays = 0
+        if (tracksCount > 0 && token) {
+          const trackIds = profile.tracks.map(t => t.id)
+          const playsPromises = trackIds.map(trackId =>
+            getContentStatsTwoWeeks(trackId, 'TRACK', token)
+              .then((stats: any) => stats?.playsCount || 0)
+              .catch(() => 0)
+          )
+          const playsArray = await Promise.all(playsPromises)
+          totalPlays = playsArray.reduce((sum, plays) => sum + plays, 0)
+        }
+
+        setStats({
+          likes: likesCount,
+          tracks: tracksCount,
+          playlists: playlistsCount,
+          plays: totalPlays
+        })
+      } catch (error) {
+        console.error('Failed to load stats:', error)
+        setStats({ likes: 0, tracks: 0, playlists: 0, plays: 0 })
+      } finally {
+        setLoadingStats(false)
+      }
+    }
+
+    loadStats()
+  }, [profile, userId, currentUserId])
+
 
   useEffect(() => {
     const load = async () => {
@@ -123,8 +290,9 @@ export function ProfilePage() {
           }
 
           try {
-            const recommendations = await getFansAlsoLike(targetUserId, 5)
-            setFansAlsoLike(recommendations)
+            const recommendations = await getFansAlsoLike(targetUserId, 50)
+            const publicRecommendations = recommendations.filter((t: any) => !t.isPrivate)
+            setFansAlsoLike(publicRecommendations)
           } catch (recError) {
             console.error('Failed to load recommendations:', recError)
             setFansAlsoLike([])
@@ -144,26 +312,14 @@ export function ProfilePage() {
     void load()
   }, [navigate, userId, currentUserId, setTrackList])
 
-  const sharedItems = useMemo(() => {
-    if (!profile) return []
-    return profile.shared.map((activity) => ({
-      id: activity.id,
-      title: activity.message || `Shared ${activity.contentType.toLowerCase()}`,
-      subtitle: new Date(activity.createdAt).toLocaleDateString(),
-    }))
-  }, [profile])
-
   const likedTrackIds = useMemo(() => {
     return new Set(contextLikedTracks.map((track) => track.id))
   }, [contextLikedTracks])
 
-  const resolveImage = useCallback((path?: string) => {
-    if (!path) return ''
-    if (path.startsWith('http://') || path.startsWith('https://')) return path
+  const sharedContentIds = useMemo(() => {
+    return new Set(mySharedActivities.map((a) => `${a.contentType}-${a.contentId}`))
+  }, [mySharedActivities])
 
-    const normalizedPath = path.replaceAll('\\', '/').replace(/^wwwroot\//, '')
-    return `${getApiOrigin()}${normalizedPath.startsWith('/') ? normalizedPath : `/${normalizedPath}`}`
-  }, [])
 
   const handlePlayTrack = useCallback((_trackId: string) => {
     if (!profile) return
@@ -211,10 +367,22 @@ export function ProfilePage() {
     setTrackList(trackList)
   }, [contextLikedTracks, profile, userId, currentUserId, resolveImage, setTrackList])
 
+  const handlePlayFansAlsoLike = useCallback((_trackId: string) => {
+    const trackList = fansAlsoLike.map((track) => ({
+      id: track.id,
+      title: track.title,
+      subtitle: track.username?.startsWith('Deleted_') ? 'Deleted user' : (track.username || 'Unknown Artist'),
+      imageUrl: track.trackImagePath ? `${getApiOrigin()}/${track.trackImagePath.replace(/^\//, '')}` : undefined,
+      duration: track.duration,
+      userId: track.userId,
+    }))
+    setTrackList(trackList)
+  }, [fansAlsoLike, setTrackList])
+
   const handleFollowToggle = async () => {
     if (!userId) return
 
-    const token = localStorage.getItem('authToken')
+    const token = getToken()
     if (!token) {
       alert('You need to log in to follow users')
       return
@@ -243,7 +411,7 @@ export function ProfilePage() {
   }
 
   const handlePlayPlaylist = async (playlistId: string) => {
-    const token = localStorage.getItem('authToken')
+    const token = getToken()
     if (!token) {
       alert('You need to log in to play playlists')
       return
@@ -301,7 +469,7 @@ export function ProfilePage() {
   const handleDeletePlaylist = async (playlistId: string) => {
     if (!confirm('Are you sure you want to delete this playlist?')) return
 
-    const token = localStorage.getItem('authToken')
+    const token = getToken()
     if (!token) {
       alert('You need to log in to delete playlists')
       return
@@ -320,7 +488,7 @@ export function ProfilePage() {
   const handleLikeToggle = async (trackId: string, isLiked: boolean) => {
     if (!profile) return
 
-    const token = localStorage.getItem('authToken')
+    const token = getToken()
     if (!token) {
       alert('You need to log in to like tracks')
       return
@@ -371,7 +539,7 @@ export function ProfilePage() {
   const handleDelete = async (trackId: string) => {
     if (!profile) return
 
-    const token = localStorage.getItem('authToken')
+    const token = getToken()
     if (!token) {
       alert('You need to log in to delete tracks')
       return
@@ -550,6 +718,12 @@ export function ProfilePage() {
                         onDelete={track.userId === currentUserId ? handleDelete : undefined}
                         onEdit={track.userId === currentUserId ? (trackId) => navigate(`/track/${trackId}/edit`) : undefined}
                         onPlay={handlePlayTrack}
+                        isShared={sharedContentIds.has(`TRACK-${track.id}`)}
+                        onShare={isAuthenticated && !sharedContentIds.has(`TRACK-${track.id}`) ? (contentId, contentType) => handleShare(contentId, contentType, track.title, track.username || 'Deleted User', resolveImage(track.trackImagePath)) : undefined}
+                        onUnshare={isAuthenticated && sharedContentIds.has(`TRACK-${track.id}`) ? () => {
+                          const activity = sharedActivities.find(a => a.contentType === 'TRACK' && a.contentId === track.id)
+                          if (activity) handleUnshare(activity.id)
+                        } : undefined}
                       />
                     ))}
                     {profile.tracks.length === 0 ? <p className="track-meta">No tracks yet.</p> : null}
@@ -600,6 +774,12 @@ export function ProfilePage() {
                           isPrivate={!playlist.isPublic}
                           isPlaylistTile={true}
                           userId={playlist.userId}
+                          isShared={sharedContentIds.has(`PLAYLIST-${playlist.id}`)}
+                          onShare={isAuthenticated && !sharedContentIds.has(`PLAYLIST-${playlist.id}`) ? (contentId, contentType) => handleShare(contentId, contentType, playlist.name, playlist.username || 'Unknown Artist', resolveImage(playlist.playlistImagePath)) : undefined}
+                          onUnshare={isAuthenticated && sharedContentIds.has(`PLAYLIST-${playlist.id}`) ? () => {
+                            const activity = sharedActivities.find(a => a.contentType === 'PLAYLIST' && a.contentId === playlist.id)
+                            if (activity) handleUnshare(activity.id)
+                          } : undefined}
                         />
                       ))
                     })()}
@@ -616,13 +796,85 @@ export function ProfilePage() {
 
                 {activeTab === 'shared' ? (
                   <>
-                    {sharedItems.map((item) => (
-                      <div key={item.id} className="profile-list-item">
-                        <p className="track-title">{item.title}</p>
-                        <p className="track-meta">{item.subtitle}</p>
-                      </div>
-                    ))}
-                    {sharedItems.length === 0 ? <p className="track-meta">Nothing shared yet.</p> : null}
+                    {loadingShared ? (
+                      <p className="track-meta">Loading...</p>
+                    ) : sharedActivities.length === 0 ? (
+                      <p className="track-meta">Nothing shared yet.</p>
+                    ) : (
+                      <>
+                        {sharedActivities.slice(0, 4).map((activity) => {
+                          const key = `${activity.contentType}-${activity.contentId}`
+                          const content = sharedContentDetails.get(key)
+                          if (!content) return null
+
+                          return (
+                            <div key={activity.id} className="shared-item-wrapper">
+                              {activity.message && (
+                                <div className="shared-comment">
+                                  <p className="shared-comment-text">{activity.message}</p>
+                                  <p className="shared-date">{new Date(activity.createdAt).toLocaleDateString()}</p>
+                                </div>
+                              )}
+                              {activity.contentType === 'TRACK' ? (
+                                <ProfileMediaTile
+                                  title={content.title}
+                                  subtitle={content.username || 'Deleted User'}
+                                  imageUrl={resolveImage(content.trackImagePath)}
+                                  trailingText={`${Math.floor(content.duration / 60)}:${String(content.duration % 60).padStart(2, '0')}`}
+                                  trackId={content.id}
+                                  canPlay={!content.isPrivate || content.userId === currentUserId}
+                                  isLiked={isAuthenticated ? likedTrackIds.has(content.id) : false}
+                                  onLikeToggle={isAuthenticated ? handleLikeToggle : undefined}
+                                  userId={content.userId}
+                                  isPrivate={content.isPrivate}
+                                  isCreator={content.userId === currentUserId}
+                                  isTrackAuthor={content.userId === currentUserId}
+                                  onDelete={content.userId === currentUserId ? handleDelete : undefined}
+                                  onEdit={content.userId === currentUserId ? (trackId) => navigate(`/track/${trackId}/edit`) : undefined}
+                                  onPlay={handlePlayTrack}
+                                  isShared={sharedContentIds.has(`TRACK-${content.id}`)}
+                                  onShare={isAuthenticated && !sharedContentIds.has(`TRACK-${content.id}`) ? (contentId, contentType) => handleShare(contentId, contentType, content.title, content.username || 'Deleted User', resolveImage(content.trackImagePath)) : undefined}
+                                  onUnshare={isAuthenticated && sharedContentIds.has(`TRACK-${content.id}`) ? () => {
+                                    const userActivity = sharedActivities.find(a => a.contentType === 'TRACK' && a.contentId === content.id)
+                                    if (userActivity) handleUnshare(userActivity.id)
+                                  } : undefined}
+                                />
+                              ) : (
+                                <ProfileMediaTile
+                                  title={content.name}
+                                  subtitle={content.username || 'Unknown Artist'}
+                                  imageUrl={resolveImage(content.playlistImagePath)}
+                                  playlistId={content.id}
+                                  canPlay={true}
+                                  onPlay={() => handlePlayPlaylist(content.id)}
+                                  isCreator={content.userId === currentUserId}
+                                  onEditPlaylist={handleEditPlaylist}
+                                  onDeletePlaylist={handleDeletePlaylist}
+                                  isPrivate={!content.isPublic}
+                                  isPlaylistTile={true}
+                                  userId={content.userId}
+                                  isShared={sharedContentIds.has(`PLAYLIST-${content.id}`)}
+                                  onShare={isAuthenticated && !sharedContentIds.has(`PLAYLIST-${content.id}`) ? (contentId, contentType) => handleShare(contentId, contentType, content.name, content.username || 'Unknown Artist', resolveImage(content.playlistImagePath)) : undefined}
+                                  onUnshare={isAuthenticated && sharedContentIds.has(`PLAYLIST-${content.id}`) ? () => {
+                                    const userActivity = sharedActivities.find(a => a.contentType === 'PLAYLIST' && a.contentId === content.id)
+                                    if (userActivity) handleUnshare(userActivity.id)
+                                  } : undefined}
+                                />
+                              )}
+                            </div>
+                          )
+                        })}
+                        {sharedActivities.length > 4 && (
+                          <button
+                            type="button"
+                            className="profile-see-more"
+                            onClick={() => navigate(`/profile/${userId || currentUserId}/shared`)}
+                          >
+                            See more
+                          </button>
+                        )}
+                      </>
+                    )}
                   </>
                 ) : null}
               </div>
@@ -631,22 +883,31 @@ export function ProfilePage() {
             <aside className="panel profile-side">
               <div className="profile-side-header profile-side-section-title">
                 <h3>Statistics</h3>
+                {(!userId || userId === currentUserId) && (
+                  <button
+                    type="button"
+                    className="profile-see-more"
+                    onClick={() => navigate(`/profile/${userId || currentUserId}/stats`)}
+                  >
+                    See more
+                  </button>
+                )}
               </div>
               <div className="profile-side-stats">
                 <div className="profile-pill">
-                  <span className="profile-pill-value">12.4K</span>
+                  <span className="profile-pill-value">{loadingStats ? '...' : stats.plays}</span>
                   <span className="profile-pill-label">Plays</span>
                 </div>
                 <div className="profile-pill">
-                  <span className="profile-pill-value">438</span>
+                  <span className="profile-pill-value">{loadingStats ? '...' : stats.likes}</span>
                   <span className="profile-pill-label">Likes</span>
                 </div>
                 <div className="profile-pill">
-                  <span className="profile-pill-value">27</span>
+                  <span className="profile-pill-value">{loadingStats ? '...' : stats.tracks}</span>
                   <span className="profile-pill-label">Tracks</span>
                 </div>
                 <div className="profile-pill">
-                  <span className="profile-pill-value">9</span>
+                  <span className="profile-pill-value">{loadingStats ? '...' : stats.playlists}</span>
                   <span className="profile-pill-label">Playlists</span>
                 </div>
               </div>
@@ -682,6 +943,12 @@ export function ProfilePage() {
                         onDelete={track.userId === currentUserId ? handleDelete : undefined}
                         onEdit={track.userId === currentUserId ? (trackId) => navigate(`/track/${trackId}/edit`) : undefined}
                         onPlay={handlePlayLikedTrack}
+                        isShared={sharedContentIds.has(`TRACK-${track.id}`)}
+                        onShare={isAuthenticated && !sharedContentIds.has(`TRACK-${track.id}`) ? (contentId, contentType) => handleShare(contentId, contentType, track.title, track.subtitle || 'Deleted User', track.imageUrl) : undefined}
+                        onUnshare={isAuthenticated && sharedContentIds.has(`TRACK-${track.id}`) ? () => {
+                          const activity = sharedActivities.find(a => a.contentType === 'TRACK' && a.contentId === track.id)
+                          if (activity) handleUnshare(activity.id)
+                        } : undefined}
                       />
                     ))
                   )
@@ -706,6 +973,12 @@ export function ProfilePage() {
                         onDelete={track.userId === currentUserId ? handleDelete : undefined}
                         onEdit={track.userId === currentUserId ? (trackId) => navigate(`/track/${trackId}/edit`) : undefined}
                         onPlay={handlePlayLikedTrack}
+                        isShared={sharedContentIds.has(`TRACK-${track.id}`)}
+                        onShare={isAuthenticated && !sharedContentIds.has(`TRACK-${track.id}`) ? (contentId, contentType) => handleShare(contentId, contentType, track.title, track.username || 'Deleted User', resolveImage(track.trackImagePath)) : undefined}
+                        onUnshare={isAuthenticated && sharedContentIds.has(`TRACK-${track.id}`) ? () => {
+                          const activity = sharedActivities.find(a => a.contentType === 'TRACK' && a.contentId === track.id)
+                          if (activity) handleUnshare(activity.id)
+                        } : undefined}
                       />
                     ))
                   )
@@ -725,7 +998,7 @@ export function ProfilePage() {
                 )}
               </div>
               <div className="profile-list">
-                {fansAlsoLike.slice(0, 3).map((item) => (
+                {fansAlsoLike.slice(0, 3).map((item, index) => (
                   <ProfileMediaTile
                     key={item.id}
                     title={item.title}
@@ -737,6 +1010,14 @@ export function ProfilePage() {
                     userId={item.userId}
                     isLiked={isAuthenticated ? likedTrackIds.has(item.id) : false}
                     onLikeToggle={isAuthenticated ? handleLikeToggle : undefined}
+                    onPlay={handlePlayFansAlsoLike}
+                    trackNumber={index + 1}
+                    isShared={sharedContentIds.has(`TRACK-${item.id}`)}
+                    onShare={isAuthenticated && !sharedContentIds.has(`TRACK-${item.id}`) ? (contentId, contentType) => handleShare(contentId, contentType, item.title, item.username?.startsWith('Deleted_') ? 'Deleted user' : (item.username || 'Unknown Artist'), item.trackImagePath ? `${getApiOrigin()}/${item.trackImagePath.replace(/^\//, '')}` : undefined) : undefined}
+                    onUnshare={isAuthenticated && sharedContentIds.has(`TRACK-${item.id}`) ? () => {
+                      const activity = sharedActivities.find(a => a.contentType === 'TRACK' && a.contentId === item.id)
+                      if (activity) handleUnshare(activity.id)
+                    } : undefined}
                   />
                 ))}
               </div>
@@ -819,6 +1100,15 @@ export function ProfilePage() {
           </div>
         </div>
       ) : null}
+
+      {shareModal && (
+        <ShareModal
+          content={shareModal.content}
+          contentType={shareModal.contentType}
+          onShare={handleShareSubmit}
+          onCancel={() => setShareModal(null)}
+        />
+      )}
 
       {profile && peopleModal ? (
         <div className="profile-edit-modal-backdrop" onClick={closePeopleModal}>

@@ -18,6 +18,10 @@ export function getMyPlaylists(token: string) {
   return request<PlaylistDto[]>('/playlists/me', { token })
 }
 
+export function getPopularPlaylists(count: number = 6, token?: string) {
+  return request<PlaylistDto[]>(`/playlists/popular?count=${count}`, { token })
+}
+
 export function getLikedPlaylists(token: string) {
   return request<PlaylistDto[]>('/contentlikes/me/playlists', { token })
 }

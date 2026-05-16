@@ -210,8 +210,22 @@ export function AudioProvider({ children }: { children: ReactNode }) {
     setPlaysCount((prev) => prev + 1)
   }, [])
 
+  const stopAndClearAudio = useCallback(() => {
+    if (audioRef.current) {
+      audioRef.current.pause()
+      audioRef.current = null
+    }
+    clearProgressInterval()
+    clearPlayTimer()
+    setCurrentTrack(null)
+    setIsPlaying(false)
+    setProgress(0)
+    setDuration(0)
+    setPlaysCount(0)
+  }, [clearProgressInterval, clearPlayTimer])
+
   return (
-    <AudioContext.Provider value={{ currentTrack, isPlaying, progress, duration, volume, trackList, likedTracks, playsCount, playTrack, pauseTrack, resumeTrack, seek, setVolume, nextTrack, prevTrack, setTrackList, setLikedTracks, toggleLike, incrementPlaysCount }}>
+    <AudioContext.Provider value={{ currentTrack, isPlaying, progress, duration, volume, trackList, likedTracks, playsCount, playTrack, pauseTrack, resumeTrack, seek, setVolume, nextTrack, prevTrack, setTrackList, setLikedTracks, toggleLike, incrementPlaysCount, stopAndClearAudio }}>
       {children}
     </AudioContext.Provider>
   )

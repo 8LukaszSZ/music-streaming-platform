@@ -22,5 +22,6 @@ namespace IBL
 
         Task<bool> UserOwnsPlaylistAsync(Guid userId, Guid playlistId);
         Task<bool> SetPlaylistVisibilityAsync(Guid playlistId, bool isPublic);
+        Task<List<Playlist>> GetPopularPlaylistsAsync(int count = 10);
     }
 }

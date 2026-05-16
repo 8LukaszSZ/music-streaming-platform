@@ -2,22 +2,29 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Footer } from '../components/Footer'
 import { Navbar } from '../components/Navbar'
+import { getTrendingTracks } from '../api/audioApi'
+import { getPopularPlaylists } from '../api/profileApi'
+import { getApiOrigin } from '../api/httpClient'
+import { useAuth } from '../hooks/useAuth'
 
-const trendingTracks = [
-  { title: 'Midnight Pulse', artist: 'Astra Nova', plays: '84K plays', genre: 'Synthwave', duration: '3:14' },
-  { title: 'Neon Streets', artist: 'Kairo', plays: '61K plays', genre: 'Alt Pop', duration: '2:58' },
-  { title: 'Cloudline', artist: 'Lumi', plays: '45K plays', genre: 'Lo-fi', duration: '3:42' },
-  { title: 'Gravity Echo', artist: 'Elar', plays: '39K plays', genre: 'House', duration: '4:01' },
-  { title: 'Afterlight', artist: 'Mono Vale', plays: '33K plays', genre: 'Indie', duration: '2:45' },
-  { title: 'Zero Hour', artist: 'Daxon', plays: '27K plays', genre: 'Trap', duration: '3:27' },
-]
+interface TrendingTrack {
+  id: string
+  title: string
+  username: string
+  userId: string
+  trackImagePath?: string
+  duration: number
+}
 
-const featuredPlaylists = [
-  { name: 'Late Night Coding', tag: 'Electronic / Chill', tracks: '42 tracks' },
-  { name: 'Focus Flow', tag: 'Lo-fi / Ambient', tracks: '28 tracks' },
-  { name: 'Fresh Finds Weekly', tag: 'Trending / New', tracks: '35 tracks' },
-  { name: 'Sunset Drive', tag: 'Pop / House', tracks: '21 tracks' },
-]
+interface PopularPlaylist {
+  id: string
+  name: string
+  description?: string
+  userId: string
+  username?: string
+  playlistImagePath?: string
+  isPublic: boolean
+}
 
 export function HomePage() {
   const navigate = useNavigate()
@@ -35,7 +42,10 @@ export function HomePage() {
     },
   ]
   const [activeSlide, setActiveSlide] = useState(0)
-  const isAuthenticated = Boolean(localStorage.getItem('authToken'))
+  const [trendingTracks, setTrendingTracks] = useState<TrendingTrack[]>([])
+  const [popularPlaylists, setPopularPlaylists] = useState<PopularPlaylist[]>([])
+  const [loading, setLoading] = useState(true)
+  const isAuthenticated = useAuth()
 
   useEffect(() => {
     const timer = window.setInterval(() => {
@@ -44,6 +54,27 @@ export function HomePage() {
 
     return () => window.clearInterval(timer)
   }, [slides.length])
+
+  useEffect(() => {
+    const loadHomeData = async () => {
+      setLoading(true)
+      try {
+        const token = localStorage.getItem('authToken') || undefined
+        const [tracks, playlists] = await Promise.all([
+          getTrendingTracks(6, token),
+          getPopularPlaylists(4, token)
+        ])
+        setTrendingTracks(tracks)
+        setPopularPlaylists(playlists)
+      } catch (error) {
+        console.error('Failed to load home data:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    loadHomeData()
+  }, [])
 
   return (
     <main>
@@ -69,7 +100,7 @@ export function HomePage() {
                   <button
                     type="button"
                     className="hero-btn primary"
-                    onClick={() => navigate(isAuthenticated ? '/stream' : '/register')}
+                    onClick={() => navigate(isAuthenticated ? '/upload' : '/login')}
                   >
                     Upload
                   </button>
@@ -95,43 +126,78 @@ export function HomePage() {
         <section className="home-section">
           <div className="section-header">
             <h2>Trending Tracks</h2>
-            <Link to="/stream">Explore all tracks</Link>
+            <Link to="/trending">Explore all tracks</Link>
           </div>
           <div className="tiles-grid">
-            {trendingTracks.map((track, index) => (
-              <article key={track.title} className="media-tile">
-                <div className={`tile-cover cover-${(index % 6) + 1}`}>
-                  <span>{track.genre}</span>
-                </div>
-                <div className="tile-body">
-                  <p className="track-title">{track.title}</p>
-                  <p className="track-meta">{track.artist}</p>
-                  <div className="tile-stats">
-                    <span>{track.plays}</span>
-                    <span>{track.duration}</span>
+            {loading ? (
+              <p>Loading trending tracks...</p>
+            ) : trendingTracks.length === 0 ? (
+              <p>No trending tracks yet.</p>
+            ) : (
+              trendingTracks.map((track, index) => (
+                <article
+                  key={track.id}
+                  className="media-tile"
+                  onClick={() => navigate(`/track/${track.id}`)}
+                  style={{ cursor: 'pointer' }}
+                >
+                  <div className={`tile-cover cover-${(index % 6) + 1}`}>
+                    {track.trackImagePath && (
+                      <img
+                        src={`${getApiOrigin()}/${track.trackImagePath.replace(/^\//, '')}`}
+                        alt={track.title}
+                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                      />
+                    )}
                   </div>
-                </div>
-              </article>
-            ))}
+                  <div className="tile-body">
+                    <p className="track-title">{track.title}</p>
+                    <p className="track-meta">{track.username || 'Unknown Artist'}</p>
+                    <div className="tile-stats">
+                      <span>{track.duration ? `${Math.floor(track.duration / 60)}:${String(track.duration % 60).padStart(2, '0')}` : '-'}</span>
+                    </div>
+                  </div>
+                </article>
+              ))
+            )}
           </div>
         </section>
 
         <section className="home-section">
           <div className="section-header">
             <h2>Popular Playlists</h2>
-            <Link to="/stream">Explore playlists</Link>
+            <Link to="/playlists/popular">Explore playlists</Link>
           </div>
           <div className="playlist-grid">
-            {featuredPlaylists.map((playlist) => (
-              <article key={playlist.name} className="playlist-tile">
-                <div className="playlist-thumb" />
-                <div>
-                  <p className="playlist-name">{playlist.name}</p>
-                  <p className="track-meta">{playlist.tag}</p>
-                  <p className="playlist-extra">{playlist.tracks}</p>
-                </div>
-              </article>
-            ))}
+            {loading ? (
+              <p>Loading popular playlists...</p>
+            ) : popularPlaylists.length === 0 ? (
+              <p>No popular playlists yet.</p>
+            ) : (
+              popularPlaylists.map((playlist) => (
+                <article
+                  key={playlist.id}
+                  className="playlist-tile"
+                  onClick={() => navigate(`/playlist/${playlist.id}`)}
+                  style={{ cursor: 'pointer' }}
+                >
+                  <div className="playlist-thumb">
+                    {playlist.playlistImagePath && (
+                      <img
+                        src={`${getApiOrigin()}/${playlist.playlistImagePath.replace(/^\//, '')}`}
+                        alt={playlist.name}
+                        style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '8px' }}
+                      />
+                    )}
+                  </div>
+                  <div>
+                    <p className="playlist-name">{playlist.name}</p>
+                    <p className="track-meta">{playlist.username || 'Unknown'}</p>
+                    <p className="playlist-extra">{playlist.description || 'Public playlist'}</p>
+                  </div>
+                </article>
+              ))
+            )}
           </div>
         </section>
 
@@ -144,7 +210,7 @@ export function HomePage() {
               fans on WaveStream.
             </p>
           </div>
-          <button type="button" onClick={() => navigate(isAuthenticated ? '/stream' : '/register')}>
+          <button type="button" onClick={() => navigate(isAuthenticated ? '/upload' : '/login')}>
             Start uploading
           </button>
         </section>

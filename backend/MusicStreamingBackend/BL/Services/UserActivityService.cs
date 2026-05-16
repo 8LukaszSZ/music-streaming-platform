@@ -76,8 +76,17 @@ namespace BL.Services
             return await _activityRepository.AddAsync(activity);
         }
 
-        public async Task<UserActivity?> DeleteActivityAsync(Guid activityId)
+        public async Task<UserActivity?> DeleteActivityAsync(Guid activityId, Guid userId)
         {
+            var activity = await _activityRepository.GetUserActivities()
+                .FirstOrDefaultAsync(ua => ua.Id == activityId);
+
+            if (activity == null)
+                return null;
+
+            if (activity.UserId != userId)
+                return null;
+
             return await _activityRepository.DeleteAsync(activityId);
         }
     }

@@ -97,7 +97,6 @@ namespace BL.Services
             Guid artistUserId,
             int count = 10)
         {
-            // Krok 1: ID utworów artysty
             var artistTrackIds = await _trackRepository.GetLocalTracks()
                 .Where(t => t.UserId == artistUserId)
                 .Select(t => t.Id)
@@ -105,7 +104,6 @@ namespace BL.Services
 
             if (!artistTrackIds.Any()) return [];
 
-            // Krok 2: Fani + liczba odtworzeń artysty (im więcej słuchał, tym ważniejszy fan)
             var fanWeights = await _playRepository.GetContentPlays()
                 .Where(cp =>
                     cp.ContentType == "TRACK" &&
@@ -121,7 +119,6 @@ namespace BL.Services
             var fanUserIds = fanWeights.Select(f => f.UserId).ToList();
             var weightDict = fanWeights.ToDictionary(f => f.UserId, f => f.Weight);
 
-            // Krok 3: Inne utwory słuchane przez fanów z ważonym scoringiem
             var candidatePlays = await _playRepository.GetContentPlays()
                 .Where(cp =>
                     cp.ContentType == "TRACK" &&
@@ -131,15 +128,12 @@ namespace BL.Services
                 .Select(cp => new { cp.ContentId, cp.UserId })
                 .ToListAsync();
 
-            // Krok 5: Scoring w pamięci — ważony przez "jakość" fana
             var scored = candidatePlays
                 .GroupBy(p => p.ContentId)
                 .Select(g => new
                 {
                     TrackId = g.Key,
-                    // Score = suma wag fanów, którzy tego słuchali
                     Score = g.Sum(p => weightDict.GetValueOrDefault(p.UserId!.Value, 1)),
-                    // Dodatkowy sygnał: liczba unikalnych fanów (nie tylko odtworzenia)
                     UniqueFans = g.Select(p => p.UserId).Distinct().Count()
                 })
                 .OrderByDescending(x => x.Score)
@@ -156,11 +150,47 @@ namespace BL.Services
                 .Where(t => scored.Contains(t.Id))
                 .ToListAsync();
 
-            // Zachowaj kolejność scoringu
             return scored
                 .Select(id => tracks.FirstOrDefault(t => t.Id == id))
                 .Where(t => t != null)
                 .ToList()!;
+        }
+
+        public async Task<List<LocalTrack>> GetTrendingTracksAsync(int count = 10)
+        {
+            var tracksWithPlays = await _trackRepository.GetLocalTracks()
+                .AsNoTracking()
+                .Include(t => t.User)
+                .Where(t => !t.IsPrivate)
+                .Select(t => new
+                {
+                    Track = t,
+                    PlayCount = _playRepository.GetContentPlays()
+                        .Count(cp => cp.ContentId == t.Id && cp.ContentType == "TRACK")
+                })
+                .ToListAsync();
+
+            //  plays / (age_in_hours + 2)^1.5
+            var now = DateTime.UtcNow;
+            var scoredTracks = tracksWithPlays
+                .Select(tp =>
+                {
+                    var ageInHours = (now - tp.Track.UploadedAt).TotalHours;
+                    var score = tp.PlayCount / Math.Pow(ageInHours + 2, 1.5);
+                    return new
+                    {
+                        Track = tp.Track,
+                        Score = score,
+                        PlayCount = tp.PlayCount
+                    };
+                })
+                .OrderByDescending(x => x.Score)
+                .ThenByDescending(x => x.Track.UploadedAt)
+                .Take(count)
+                .Select(x => x.Track)
+                .ToList();
+
+            return scoredTracks;
         }
     }
 }

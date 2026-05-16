@@ -1,17 +1,23 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import type { FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { loginUser } from '../services/authService'
 import { validateLogin } from '../validation/authValidation'
+import { useAudio } from '../contexts/AudioContext'
 
 export function LoginPage() {
   const navigate = useNavigate()
+  const { stopAndClearAudio } = useAudio()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [passwordVisible, setPasswordVisible] = useState(false)
   const [errors, setErrors] = useState<{ email?: string; password?: string; form?: string }>({})
   const [success, setSuccess] = useState('')
   const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    stopAndClearAudio()
+  }, [stopAndClearAudio])
 
   const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()

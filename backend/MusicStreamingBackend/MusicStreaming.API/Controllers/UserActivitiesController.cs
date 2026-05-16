@@ -79,10 +79,11 @@ namespace MusicStreaming.API.Controllers
 
         // DELETE: api/useractivities/{activityId}
         [HttpDelete("{activityId:guid}")]
-        [Authorize(Roles = UserRoles.Admin)]
+        [Authorize(Roles = $"{UserRoles.User},{UserRoles.Admin}")]
         public async Task<ActionResult> Delete(Guid activityId)
         {
-            var removed = await _userActivityService.DeleteActivityAsync(activityId);
+            var userId = User.GetUserId();
+            var removed = await _userActivityService.DeleteActivityAsync(activityId, userId);
             if (removed == null)
                 return NotFound();
 

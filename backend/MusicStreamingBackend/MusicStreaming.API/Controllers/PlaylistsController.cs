@@ -169,7 +169,8 @@ namespace MusicStreaming.API.Controllers
                 Description = playlist.Description,
                 IsPublic = playlist.IsPublic,
                 CreatedAt = playlist.CreatedAt,
-                PlaylistImagePath = playlist.PlaylistImagePath
+                PlaylistImagePath = playlist.PlaylistImagePath,
+                Username = playlist.User?.DisplayUsername()
             };
 
             return Ok(dto);
@@ -307,6 +308,28 @@ namespace MusicStreaming.API.Controllers
 
             await _playlistService.DeletePlaylistAsync(id);
             return NoContent();
+        }
+
+        // GET: api/playlists/popular?count=10
+        [HttpGet("popular")]
+        [AllowAnonymous]
+        public async Task<ActionResult<IEnumerable<PlaylistResponseDto>>> GetPopular([FromQuery] int count = 6)
+        {
+            var playlists = await _playlistService.GetPopularPlaylistsAsync(count);
+
+            var result = playlists.Select(p => new PlaylistResponseDto
+            {
+                Id = p.Id,
+                UserId = p.UserId,
+                Name = p.Name,
+                Description = p.Description,
+                IsPublic = p.IsPublic,
+                CreatedAt = p.CreatedAt,
+                PlaylistImagePath = p.PlaylistImagePath,
+                Username = p.User?.DisplayUsername()
+            });
+
+            return Ok(result);
         }
     }
 }
