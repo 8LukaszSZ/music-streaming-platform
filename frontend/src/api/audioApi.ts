@@ -132,7 +132,8 @@ export function uploadTrack(
   isPublic: boolean,
   valence?: string,
   energy?: string,
-  token?: string
+  token?: string,
+  onProgress?: (percent: number) => void
 ) {
   const formData = new FormData()
   formData.append('File', audioFile)
@@ -149,17 +150,34 @@ export function uploadTrack(
     formData.append('Energy', energy)
   }
 
-  return fetch(`${API_BASE_URL}/localtracks`, {
-    method: 'POST',
-    headers: {
-      Authorization: token ? `Bearer ${token}` : '',
-    },
-    body: formData,
-  }).then((response) => {
-    if (!response.ok) {
-      throw new Error('Upload failed')
+  return new Promise<{ id: string }>((resolve, reject) => {
+    const xhr = new XMLHttpRequest()
+    xhr.open('POST', `${API_BASE_URL}/localtracks`)
+    if (token) {
+      xhr.setRequestHeader('Authorization', `Bearer ${token}`)
     }
-    return response.json()
+
+    xhr.upload.addEventListener('progress', (event) => {
+      if (event.lengthComputable && onProgress) {
+        onProgress(Math.round((event.loaded / event.total) * 100))
+      }
+    })
+
+    xhr.addEventListener('load', () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        try {
+          resolve(JSON.parse(xhr.responseText) as { id: string })
+        } catch {
+          reject(new Error('Upload failed'))
+        }
+        return
+      }
+      reject(new Error('Upload failed'))
+    })
+
+    xhr.addEventListener('error', () => reject(new Error('Upload failed')))
+    xhr.addEventListener('abort', () => reject(new Error('Upload cancelled')))
+    xhr.send(formData)
   })
 }
 

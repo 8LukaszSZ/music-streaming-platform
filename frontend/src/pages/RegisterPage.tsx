@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react'
 import type { FormEvent } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { registerUser } from '../services/authService'
 import { validateRegister } from '../validation/authValidation'
 import { useAudio } from '../contexts/AudioContext'
 
 export function RegisterPage() {
   const { stopAndClearAudio } = useAudio()
+  const navigate = useNavigate()
   const [username, setUsername] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -42,11 +43,7 @@ export function RegisterPage() {
 
     try {
       await registerUser({ username, email, password })
-      setSuccess('Account created successfully. You can now log in.')
-      setUsername('')
-      setEmail('')
-      setPassword('')
-      setConfirmPassword('')
+      navigate('/')
     } catch (submitError) {
       const message = submitError instanceof Error ? submitError.message : 'Registration failed.'
       setErrors({ form: message })

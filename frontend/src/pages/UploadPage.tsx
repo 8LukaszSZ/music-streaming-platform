@@ -4,8 +4,9 @@ import { Navbar } from '../components/Navbar'
 import { Footer } from '../components/Footer'
 import { ImageCropper } from '../components/ImageCropper'
 import { uploadTrack } from '../api/audioApi'
-import { useCurrentUser } from '../hooks/useCurrentUser'
+import { getMe } from '../api/profileApi'
 import { useAuth } from '../hooks/useAuth'
+import { getToken } from '../utils/auth'
 
 export function UploadPage() {
   const navigate = useNavigate()
@@ -21,19 +22,21 @@ export function UploadPage() {
   const [showAdvanced, setShowAdvanced] = useState(false)
   const [valence, setValence] = useState('')
   const [energy, setEnergy] = useState('')
+  const [isUploading, setIsUploading] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState(0)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const audioInputRef = useRef<HTMLInputElement>(null)
 
-  const currentUserId = useCurrentUser()
   const isAuthenticated = useAuth()
 
-  const username = currentUserId || ''
-
   useEffect(() => {
-    if (username) {
-      setArtist(username)
-    }
-  }, [username])
+    const token = getToken()
+    if (!token) return
+
+    getMe(token)
+      .then((user) => setArtist(user.username))
+      .catch((err) => console.error('Failed to load current user:', err))
+  }, [])
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -73,10 +76,13 @@ export function UploadPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!audioFile || !title || !artist) return
+    if (!audioFile || !title || !artist || isUploading) return
+
+    const token = localStorage.getItem('authToken') || undefined
+    setIsUploading(true)
+    setUploadProgress(0)
 
     try {
-      const token = localStorage.getItem('authToken') || undefined
       const result = await uploadTrack(
         audioFile,
         imageFile,
@@ -85,13 +91,17 @@ export function UploadPage() {
         isPublic,
         valence || undefined,
         energy || undefined,
-        token
+        token,
+        setUploadProgress
       )
-      console.log('Upload successful:', result)
+      setUploadProgress(100)
       navigate(`/track/${result.id}`)
     } catch (error) {
       console.error('Upload failed:', error)
       alert('Failed to upload track')
+    } finally {
+      setIsUploading(false)
+      setUploadProgress(0)
     }
   }
 
@@ -165,9 +175,10 @@ export function UploadPage() {
               <input
                 type="text"
                 value={artist}
-                onChange={(e) => setArtist(e.target.value)}
                 placeholder="Artist name"
+                readOnly
                 required
+                style={{ cursor: 'not-allowed', opacity: 0.7 }}
               />
             </label>
 
@@ -242,11 +253,30 @@ export function UploadPage() {
               )}
             </div>
 
+            {isUploading && (
+              <div className="upload-page-progress" role="status" aria-live="polite">
+                <div className="upload-page-progress-header">
+                  <span>Uploading track…</span>
+                  <span>{uploadProgress}%</span>
+                </div>
+                <div className="upload-page-progress-track">
+                  <div
+                    className="upload-page-progress-bar"
+                    style={{ width: `${uploadProgress}%` }}
+                  />
+                </div>
+                <p className="upload-page-progress-hint">
+                  Please wait - large files may take a few minutes.
+                </p>
+              </div>
+            )}
+
             <div className="upload-page-actions">
               <button
                 type="button"
                 className="auth-button"
                 onClick={() => navigate(-1)}
+                disabled={isUploading}
                 style={{ background: 'transparent', border: '1px solid var(--border)', color: 'var(--text-h)' }}
               >
                 Cancel
@@ -254,9 +284,9 @@ export function UploadPage() {
               <button
                 type="submit"
                 className="auth-button"
-                disabled={!audioFile || !title || !artist}
+                disabled={!audioFile || !title || !artist || isUploading}
               >
-                Upload Track
+                {isUploading ? 'Uploading…' : 'Upload Track'}
               </button>
             </div>
           </div>

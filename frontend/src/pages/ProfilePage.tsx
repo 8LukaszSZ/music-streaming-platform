@@ -354,7 +354,7 @@ export function ProfilePage() {
         userId: track.userId,
       }))
     } else {
-      trackList = profile.likedTracks.map((track) => ({
+      trackList = profile!.likedTracks.map((track) => ({
         id: track.id,
         title: track.title,
         subtitle: track.username || 'Deleted User',

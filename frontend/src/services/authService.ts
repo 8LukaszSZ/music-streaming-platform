@@ -3,8 +3,11 @@ import type { LoginRequest, LoginResponse, RegisterRequest } from '../types/auth
 
 const AUTH_TOKEN_KEY = 'authToken'
 
-export async function registerUser(payload: RegisterRequest) {
-  return authApi.register(payload)
+export async function registerUser(payload: RegisterRequest): Promise<LoginResponse> {
+  const registerResponse = await authApi.register(payload)
+  localStorage.setItem(AUTH_TOKEN_KEY, registerResponse.token)
+  localStorage.setItem('userId', registerResponse.user.id)
+  return registerResponse
 }
 
 export async function loginUser(payload: LoginRequest): Promise<LoginResponse> {

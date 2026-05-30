@@ -186,16 +186,22 @@ export function PlaylistPage() {
         }
 
         if (tracksData && tracksData.length > 0) {
-          const trackDetails = await Promise.all(
-            tracksData.map(async (pt) => {
-              const trackInfo = await request<PlaylistTrackInfo>(`/LocalTracks/${pt.localTrackId}`, { token })
-              return {
-                ...trackInfo,
-                playlistTrackId: pt.id
-              }
-            })
-          )
-          console.log('Track details:', trackDetails)
+          const trackDetails = (
+            await Promise.all(
+              tracksData.map(async (pt) => {
+                try {
+                  const trackInfo = await request<PlaylistTrackInfo>(`/LocalTracks/${pt.localTrackId}`, { token })
+                  return {
+                    ...trackInfo,
+                    playlistTrackId: pt.id,
+                  }
+                } catch {
+                  return null
+                }
+              })
+            )
+          ).filter((track): track is PlaylistTrackInfo => track !== null)
+
           setTracks(trackDetails)
         }
       } catch (err) {

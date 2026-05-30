@@ -68,13 +68,20 @@ namespace MusicStreaming.API.Controllers
 
             var tracks = await _playlistTrackService.GetTracksByPlaylistIdAsync(playlistId);
 
-            var result = tracks.Select(pt => new PlaylistTrackResponseDto
-            {
-                Id = pt.Id,
-                PlaylistId = pt.PlaylistId,
-                LocalTrackId = pt.LocalTrackId,
-                //SourceType = pt.SourceType
-            });
+            var isAdmin = User.IsInRole(UserRoles.Admin);
+            Guid? viewerUserId = null;
+            if (User.Identity?.IsAuthenticated == true && !isAdmin)
+                viewerUserId = User.GetUserId();
+
+            var result = tracks
+                .Where(pt => pt.LocalTrack != null
+                    && LocalTrackAccess.CanView(pt.LocalTrack, viewerUserId, isAdmin))
+                .Select(pt => new PlaylistTrackResponseDto
+                {
+                    Id = pt.Id,
+                    PlaylistId = pt.PlaylistId,
+                    LocalTrackId = pt.LocalTrackId,
+                });
 
             return Ok(result);
         }
@@ -99,8 +106,9 @@ namespace MusicStreaming.API.Controllers
                 return NotFound();
 
             var isAdmin = User.IsInRole(UserRoles.Admin);
-            if (!LocalTrackAccess.CanAddToPlaylist(localTrack, playlist, isAdmin))
-                return BadRequest(new { message = "This song cannot be added to this playlist (private songs only to your own private playlist)." });
+            Guid? currentUserId = User.Identity?.IsAuthenticated == true ? User.GetUserId() : null;
+            if (!LocalTrackAccess.CanAddToPlaylist(localTrack, playlist, currentUserId, isAdmin))
+                return BadRequest(new { message = "Private tracks can only be added to your own playlists." });
 
             var playlistTrack = new PlaylistTrack
             {

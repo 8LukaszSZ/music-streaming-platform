@@ -13,12 +13,14 @@ public static class LocalTrackAccess
         return viewerUserId.HasValue && track.UserId == viewerUserId.Value;
     }
 
-    public static bool CanAddToPlaylist(LocalTrack track, Playlist playlist, bool isAdmin)
+    public static bool CanAddToPlaylist(LocalTrack track, Playlist playlist, Guid? currentUserId, bool isAdmin)
     {
         if (isAdmin)
             return true;
         if (!track.IsPrivate)
             return true;
-        return !playlist.IsPublic && track.UserId == playlist.UserId;
+        return currentUserId.HasValue
+            && track.UserId == currentUserId.Value
+            && playlist.UserId == currentUserId.Value;
     }
 }

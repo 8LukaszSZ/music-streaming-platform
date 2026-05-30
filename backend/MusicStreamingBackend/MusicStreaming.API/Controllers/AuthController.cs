@@ -30,7 +30,7 @@ namespace MusicStreaming.API.Controllers
         // POST: api/auth/register
         [HttpPost("register")]
         [AllowAnonymous]
-        public async Task<ActionResult<UserResponseDto>> Register([FromBody] RegisterRequestDto dto)
+        public async Task<ActionResult<LoginResponseDto>> Register([FromBody] RegisterRequestDto dto)
         {
             if (!ModelState.IsValid)
             {
@@ -59,7 +59,9 @@ namespace MusicStreaming.API.Controllers
 
             var createdUser = await _userService.AddUserAsync(user);
 
-            var response = new UserResponseDto
+            var token = _authTokenService.GenerateToken(createdUser, out DateTime expiresAt);
+
+            var userDto = new UserResponseDto
             {
                 Id = createdUser.Id,
                 Username = createdUser.DisplayUsername(),
@@ -70,11 +72,14 @@ namespace MusicStreaming.API.Controllers
                 Bio = createdUser.Bio
             };
 
-            return CreatedAtAction(
-                nameof(UserController.GetById),
-                "User",
-                new { id = createdUser.Id },
-                response);
+            var response = new LoginResponseDto
+            {
+                Token = token,
+                ExpiresAt = expiresAt,
+                User = userDto
+            };
+
+            return Ok(response);
         }
 
         // POST: api/auth/login

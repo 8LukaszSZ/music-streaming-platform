@@ -25,4 +25,4 @@ export type LoginResponse = {
   user: UserDto
 }
 
-export type RegisterResponse = UserDto
+export type RegisterResponse = LoginResponse
