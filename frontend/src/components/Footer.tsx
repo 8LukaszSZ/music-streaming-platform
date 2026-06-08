@@ -36,7 +36,9 @@ export function Footer({ isAuthenticated }: FooterProps) {
           </div>
         </div>
       </div>
-      <p className="footer-bottom">Thanks for listening with WaveStream.</p>
+      <p className="footer-bottom">
+        Thanks for listening with WaveStream. | Engineering Project by Łukasz Szkatuła
+      </p>
     </footer>
   )
 }
