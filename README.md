@@ -31,7 +31,7 @@
 
 ### Odkrywanie muzyki
 
-- Trending tracks — najpopularniejsze utwory
+- Trending tracks - najpopularniejsze utwory
 - Popularne playlisty
 - Rekomendacje „Fans also like” na podstawie historii odsłuchań
 - Wyszukiwarka utworów i artystów
@@ -147,7 +147,7 @@ VITE_API_BASE_URL=https://localhost:7232/api
 
 ---
 
-## API — główne endpointy
+## API - główne endpointy
 
 
 | Moduł          | Endpoint                 |
@@ -170,7 +170,7 @@ VITE_API_BASE_URL=https://localhost:7232/api
 
 ## Autor
 
-**Łukasz Szkatuła** — projekt inżynierski
+**Łukasz Szkatuła** - projekt inżynierski
 
 ---
 
